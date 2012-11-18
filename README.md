@@ -36,4 +36,4 @@ We apply these filters for the following reasons.
 
 1. the documents are under the path of www.lua.org/pil/
 1. we also need the image for pretty which may not be under www.lua.org/pil/
-1. lua.css is not under www.lua.org/pil, but we want that for displying the index.html correctly
+1. lua.css is not under www.lua.org/pil, but we want that for displaying the index.html correctly
