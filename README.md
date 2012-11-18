@@ -14,7 +14,7 @@ change main() function to suite your own requirement
 
 ## example
 
-* download <<programming in Lua>> online document
+* download \<\<programming in Lua\>\> online document
 
 add following lines to main()
 
