@@ -1,4 +1,4 @@
-# Download a website from just a entry link!
+# Download a website from just an entry link!
 
 
 ## supports
@@ -14,7 +14,8 @@ change main() function to suite your own requirement
 
 ## example
 
-* download programming lua document
+* download <<programming in Lua>> online document
+
 add following lines to main()
 
 ```python
