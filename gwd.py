@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-from Queue import Queue
+from Queue import Queue, Empty
 import urllib2
 from urllib2 import *
 import threading
@@ -173,8 +173,12 @@ class Memory:
             if not os.path.isfile(mem_place):
                 return None
             f = open(mem_place, 'r')
-            content = f.read()
-            links = content.split("\n")
+            content = f.read().rstrip("\n")
+
+            if content:
+                links = content.split("\n")
+            else:
+                links = []
 
             jobs = []
             for link in links:
@@ -203,7 +207,6 @@ class Downloader:
         self.store = store
         self.parser = Parser()
         self.mem_inst = mem_inst
-        self.encount_empty_time = 0
         self.exit = False
 
     def kill(self):
@@ -213,23 +216,11 @@ class Downloader:
         '''
         download routine
         '''
-        while True:
-            if self.exit:
-                break
-
-            if self.store.empty():
-                self.encount_empty_time += 1
-                time.sleep(1)
-
-            if self.encount_empty_time == 10:
-                break;
-
+        while not (self.exit or DHManager.all_is_done):
             try:
                 job = self.store.get()
-            except StoreEmptyError, e:
+            except Empty, e:
                 continue
-
-            self.encount_empty_time = 0
 
             #print job
             if Utility.is_js_label(job.get_link()):
@@ -253,7 +244,7 @@ class Downloader:
                 bechmark_start = datetime.now()
                 c, c_t = self.get_content(job)
                 bechmark_end = datetime.now()
-                print("download '%s' takes %s" %( job.get_joined_link(), (bechmark_end - bechmark_start)))
+                print "download %s, takes %s" % (link, bechmark_end - bechmark_start)
 
                 if c_t in ['text/html', 'text/css']:
                     links = self.parser.parse(c, link, self.store.get_store_path())
@@ -288,7 +279,7 @@ class Downloader:
                 raise e
             except Exception, e:
                 print "error happended %s" % e
-                traceback.print_exc()
+                continue
             finally:
                 self.store.task_done()
             
@@ -368,9 +359,6 @@ class BlackList(Filter):
 class StoreError(Exception):
     pass
 
-class StoreEmptyError(StoreError):
-    pass
-     
 class Store(Queue):
     '''
     a wrapper class to Queue.Queue, so we can control the get and put process
@@ -390,10 +378,12 @@ class Store(Queue):
 
     def get(self):
         while True:
+            '''
             if Queue.empty(self):
                 raise StoreEmptyError()
+            '''
 
-            job = Queue.get(self)
+            job = Queue.get(self, True, 0.01)
             if job.get_id() not in self.stored_job_ids:
                 self.stored_job_ids.add(job.get_id())
                 return job
@@ -485,6 +475,7 @@ class DHManager:
     manage download thread. try to brint up exited download thread if the total downloading job is not finished yet
     '''
     bringup_time = 30
+    all_is_done = False
     def __init__(self, store, mem_inst, th_count):
         self.dhs = []
         self.original_count = th_count
@@ -501,23 +492,8 @@ class DHManager:
         print "At %s, we are now downloading..." % (datetime.now().strftime(DATEFMT))
 
     def wait_for_all_exit(self):
-        while True:
-            if len(self.dhs) == 0:
-                break
-
-            if self.first_die_time != None and (datetime.now() - self.first_die_time).seconds > DHManager.bringup_time:
-                for i in range(len(self.dhs), self.original_count):
-                    self.dhs.append(DH(self.store, self.mem_inst))
-                    self.dhs[-1].start()
-                self.first_die_time = None
-
-            for dh in self.dhs:
-                if not dh.is_alive():
-                    self.dhs.remove(dh)
-                    if self.first_die_time == None:
-                        self.first_die_time = datetime.now()
-    
-            time.sleep(1)
+        self.store.join()
+        DHManager.all_is_done = True
 
     def kill(self):
         for dh in self.dhs:
@@ -533,7 +509,7 @@ class DHManager:
 
             if len(self.dhs) == 0:
                 break
-            time.sleep(1)
+            time.sleep(0.0001)
         
         print "done"
 
