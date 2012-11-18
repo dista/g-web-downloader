@@ -72,6 +72,8 @@ class Utility:
         b_parts = b.split("/")
 
         for i in xrange(len(a_parts)):
+            if i >= len(b_parts):
+                break
             if a_parts[i] != b_parts[i]:
                 break
         
@@ -93,10 +95,10 @@ class Parser:
     '''
 
     #href, src, url, import from which an url appears
-    href_regex = re.compile(r"(href\s*=\s*([\"'])([^\"']+)\2)")
-    src_regex = re.compile(r"(src\s*=\s*([\"'])([^\"']+)\2)")
-    back_images_regex = re.compile(r"(url\s*\(\s*([\"']*)([^\"'()]+)\2)\)")
-    css_import_regex = re.compile(r"(@import\s*\(\s*([\"']*)([^\"'()]+)\2)\)")
+    href_regex = re.compile(r"(href\s*=\s*([\"'])([^\"']+)\2)", re.IGNORECASE)
+    src_regex = re.compile(r"(src\s*=\s*([\"'])([^\"']+)\2)", re.IGNORECASE)
+    back_images_regex = re.compile(r"(url\s*\(\s*([\"']*)([^\"'()]+)\2)\)", re.IGNORECASE)
+    css_import_regex = re.compile(r"(@import\s*\(\s*([\"']*)([^\"'()]+)\2)\)", re.IGNORECASE)
 
     def parse(self, content, url, store_path):
         self.store_path = store_path.rstrip('/')
@@ -279,6 +281,7 @@ class Downloader:
                 raise e
             except Exception, e:
                 print "error happended %s" % e
+                #traceback.print_exc()
                 continue
             finally:
                 self.store.task_done()
@@ -384,6 +387,7 @@ class Store(Queue):
             '''
 
             job = Queue.get(self, True, 0.01)
+
             if job.get_id() not in self.stored_job_ids:
                 self.stored_job_ids.add(job.get_id())
                 return job
@@ -419,6 +423,7 @@ class Store(Queue):
         link = job.get_link()
         if '.jpg' in link \
             or '.jpeg' in link \
+            or '.gif' in link \
             or '.png' in link:
             return True
 
@@ -437,7 +442,7 @@ class DH(threading.Thread):
             self.downloader.download()
         except Exception, e:
             print e
-            traceback.print_exc()
+            #traceback.print_exc()
             thread.exit()
 
     def kill(self):
@@ -470,6 +475,17 @@ class Job:
     def __str__(self):
         return self.url
 
+class JoinThread(threading.Thread):
+    def __init__(self, store):
+        Thread.__init__(self)
+        self.daemon = True
+        self.store = store
+        
+    def run(self):
+        self.store.join()
+        DHManager.all_is_done = True
+
+
 class DHManager:
     '''
     manage download thread. try to brint up exited download thread if the total downloading job is not finished yet
@@ -484,16 +500,34 @@ class DHManager:
         self.mem_inst = mem_inst
         self.exit = False
         self.killcmd_issued = False
+        self.join_th = JoinThread(self.store)
 
         for i in range(0, th_count):
             self.dhs.append(DH(store, mem_inst))
             self.dhs[-1].start()
 
+        self.join_th.start()
+
         print "At %s, we are now downloading..." % (datetime.now().strftime(DATEFMT))
 
     def wait_for_all_exit(self):
-        self.store.join()
-        DHManager.all_is_done = True
+        while True:
+            if len(self.dhs) == 0:
+                break
+
+            if self.first_die_time != None and (datetime.now() - self.first_die_time).seconds > DHManager.bringup_time:
+                for i in range(len(self.dhs), self.original_count):
+                    self.dhs.append(DH(self.store, self.mem_inst))
+                    self.dhs[-1].start()
+                self.first_die_time = None
+
+            for dh in self.dhs:
+                if not dh.is_alive():
+                    self.dhs.remove(dh)
+                    if self.first_die_time == None:
+                        self.first_die_time = datetime.now()
+    
+            time.sleep(0.1)
 
     def kill(self):
         for dh in self.dhs:
@@ -505,7 +539,7 @@ class DHManager:
             for dh in self.dhs:
                 if not dh.is_alive():
                     self.dhs.remove(dh)
-                    print len(self.dhs)
+                    sys.stdout.write(".")
 
             if len(self.dhs) == 0:
                 break
@@ -524,7 +558,7 @@ def main():
 
     mem_inst = Memory(download_path)
 
-    #store.add_filter("\.163\.com",
+    #store.add_white_filter("\.163\.com",
     #                "cache\.netease\.com",
     #                "\.126\.net",
     #                )
@@ -537,12 +571,12 @@ def main():
     #store.put(Job("http://docs.python.org"))
 
     #store.add_white_filter("\.cnbeta\.com", "{image}")
-    store.add_white_filter("www\.lua\.org\/pil\/")
+    store.add_white_filter("www\.lua\.org\/pil\/", "{image}", "\.css")
     store.put(Job("http://www.lua.org/pil/index.html"))
     
     dh_manager = None
     try:
-        dh_manager = DHManager(store, mem_inst, 10)
+        dh_manager = DHManager(store, mem_inst, 30)
         dh_manager.wait_for_all_exit()
     except KeyboardInterrupt:
         if dh_manager != None:
