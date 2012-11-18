@@ -10,7 +10,7 @@
 ## filters
 
 filters is based on regex basically. 
-There are two kind of filter. One is white filter, and the other is black.
+There are two kind of filters. One is white filter, and the other is black.
 White filter means if the filter match the url, the url will be downloaded. The black filter do the opposite.
 Besides regex filter, a meta-filter({image}) is implemented right now. It presents image resource, including jpeg,
 gif and png resource.
