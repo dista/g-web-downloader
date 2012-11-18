@@ -1,4 +1,4 @@
-Download a website from just a simple link!
+Download a website from just a entry link!
 =============================================
 
 
