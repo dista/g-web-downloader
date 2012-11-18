@@ -18,7 +18,8 @@ gif and png resource.
 
 ## usage
 
-change main() function to suite your own requirement
+change main() function to suite your own requirement, such as downloading Lua references from lua.org, 
+Using corret filter you can download the reference perfectly -- see example below:)
 
 ## example
 
