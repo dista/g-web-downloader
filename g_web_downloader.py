@@ -20,10 +20,11 @@ import time
 def debug(msg):
     print msg
 
+DATEFMT = "%Y-%m-%d %H:%M:%S"
 
 class Utility:
     @staticmethod
-    def get_local_path(refer, url):
+    def get_local_path(refer, url, is_relative = True):
         if Utility.is_js_label(url):
             return url
         if refer == None:
@@ -51,8 +52,27 @@ class Utility:
                 path_comps[-1] = sps[0] + query_str + '.' + sps[1]
 
          
-        retval= "%s%s" % (ret.netloc.replace('.', '-'), '/'.join(path_comps))
-        return retval
+        retval = "%s%s" % (ret.netloc.replace('.', '-'), '/'.join(path_comps))
+
+        if not is_relative:
+            return retval
+        else:
+            ref_abs = Utility.get_local_path("", refer, False)
+            return Utility.get_relative_path(ref_abs, retval)
+
+    @staticmethod
+    def get_relative_path(a, b):
+        ''' b relative to a
+        '''
+        a_parts = a.split("/")
+        b_parts = b.split("/")
+
+        for i in xrange(len(a_parts)):
+            if a_parts[i] != b_parts[i]:
+                break
+        
+        return "../" * (len(a_parts) - i - 1) + "/".join(b_parts[i:])
+
 
     @staticmethod
     def is_js_label(url):
@@ -101,7 +121,7 @@ class Parser:
             t = urlparse.urlparse(urlparse.urljoin(self.url, link))
 
             if t.scheme == 'http':
-                new_full = full.replace(link, "%s/%s#%s" % (self.store_path, Utility.get_local_path(self.url, link), ps_ret.fragment))
+                new_full = full.replace(link, "%s#%s" % (Utility.get_local_path(self.url, link), ps_ret.fragment))
                 self.content = self.content.replace(full, new_full) 
                 links.append(link)
 
@@ -226,7 +246,10 @@ class Downloader:
                 
             link = job.get_joined_link()
             try:
+                bechmark_start = datetime.now()
                 c, c_t = self.get_content(job)
+                bechmark_end = datetime.now()
+                print("download '%s' takes %s" %( job.get_joined_link(), (bechmark_end - bechmark_start)))
 
                 if c_t in ['text/html', 'text/css']:
                     links = self.parser.parse(c, link, self.store.get_store_path())
@@ -234,7 +257,7 @@ class Downloader:
                 else:
                     links = []
                    
-                localpath = Utility.get_local_path(job.get_referer(), job.get_link())
+                localpath = Utility.get_local_path(job.get_referer(), job.get_link(), False)
                 localpath = os.path.join(self.store.get_store_path(), localpath) 
 
                 dir = os.path.dirname(localpath)
@@ -471,7 +494,7 @@ class DHManager:
             self.dhs.append(DH(store, mem_inst))
             self.dhs[-1].start()
 
-        print "we are now downloading..."
+        print "[%s] we are now downloading..." % (datetime.now().strftime(DATEFMT))
 
     def wait_for_all_exit(self):
         while True:
@@ -509,9 +532,15 @@ class DHManager:
             time.sleep(1)
         
         print "done"
-        
-if __name__ == '__main__':
-    download_path = '/tmp/cnbeta'
+
+def test_utility_grp():
+    a = "/root/jj.txt"
+    b = "/root/s.txt"
+    print Utility.get_relative_path(a, b)
+
+def main():
+    start_time = datetime.now()
+    download_path = '/root/lua-book'
     try:
         store = Store(download_path)
     except StoreError, e:
@@ -532,14 +561,20 @@ if __name__ == '__main__':
 
     #store.put(Job("http://docs.python.org"))
 
-    store.add_white_filter("\.cnbeta\.com", "{image}")
-    store.put(Job("http://www.cnbeta.com"))
+    #store.add_white_filter("\.cnbeta\.com", "{image}")
+    store.add_white_filter("www\.lua\.org\/pil\/")
+    store.put(Job("http://www.lua.org/pil/index.html"))
     
     dh_manager = None
     try:
-        dh_manager = DHManager(store, mem_inst, 5)
+        dh_manager = DHManager(store, mem_inst, 10)
         dh_manager.wait_for_all_exit()
     except KeyboardInterrupt:
         if dh_manager != None:
             dh_manager.kill()
-     
+
+    end_time = datetime.now()
+    print("download finished, takes %s" % (end_time - start_time))
+        
+if __name__ == '__main__':
+    main() 
