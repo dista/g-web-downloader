@@ -1,25 +1,21 @@
-Download a website from just a entry link!
-=============================================
+# Download a website from just a entry link!
 
 
-supports
-------------
+## supports
 
 * multi-thread based
 * downloaded files will not be downloaded again if re-run
 * filters, url filter and meta-filter({image})
 
 
-usage
-------------
+## usage
 
 change main() function to suite your own requirement
 
-example
-------------
+## example
 
 * download programming lua document
-add these lines to main()
+add following lines to main()
 
 ```python
 store.add_white_filter("www\.lua\.org\/pil\/", "{image}", "\.css")
