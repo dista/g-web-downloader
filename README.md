@@ -32,7 +32,8 @@ store.add_white_filter("www\.lua\.org\/pil\/", "{image}", "\.css")
 store.put(Job("http://www.lua.org/pil/index.html"))
 ```
 
-we add these filters for the following reasons.
-#. the document is under the path of www.lua.org/pil/, so we add this filter to white filter list
-#. we also need the image for pretty
-#. lua.css is not under www.lua.org/pil, but we want that for disply the index.html corretly
+We apply these filters for the following reasons.
+
+1. the documents are under the path of www.lua.org/pil/
+1. we also need the image for pretty which may not be under www.lua.org/pil/
+1. lua.css is not under www.lua.org/pil, but we want that for displying the index.html correctly
