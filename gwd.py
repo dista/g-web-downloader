@@ -62,7 +62,11 @@ class Utility:
 
     @staticmethod
     def get_relative_path(a, b):
-        ''' b relative to a
+        ''' 
+        b relative to a
+        example:
+        /root/x/1.html; /root/y/2.html
+        the result is ../../y/2.html
         '''
         a_parts = a.split("/")
         b_parts = b.split("/")
@@ -494,7 +498,7 @@ class DHManager:
             self.dhs.append(DH(store, mem_inst))
             self.dhs[-1].start()
 
-        print "[%s] we are now downloading..." % (datetime.now().strftime(DATEFMT))
+        print "At %s, we are now downloading..." % (datetime.now().strftime(DATEFMT))
 
     def wait_for_all_exit(self):
         while True:
@@ -532,11 +536,6 @@ class DHManager:
             time.sleep(1)
         
         print "done"
-
-def test_utility_grp():
-    a = "/root/jj.txt"
-    b = "/root/s.txt"
-    print Utility.get_relative_path(a, b)
 
 def main():
     start_time = datetime.now()
