@@ -32,6 +32,12 @@ store.add_white_filter("www\.lua\.org\/pil\/", "{image}", "\.css")
 store.put(Job("http://www.lua.org/pil/index.html"))
 ```
 
+also, you can set where the files will be stored
+
+```python
+download_path = '/root/lua-book'
+```
+
 We apply these filters for the following reasons.
 
 1. the documents are under the path of www.lua.org/pil/
