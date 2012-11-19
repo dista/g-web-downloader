@@ -362,6 +362,17 @@ class BlackList(Filter):
 class StoreError(Exception):
     pass
 
+class Checker:
+    def __init__(self):
+        self.pool = set()
+    def add(self, v):
+        self.pool.add(v)
+    def check(self, v):
+        if v in self.pool:
+            return True
+        else:
+            return False
+
 class Store(Queue):
     '''
     a wrapper class to Queue.Queue, so we can control the get and put process
@@ -373,7 +384,7 @@ class Store(Queue):
         self.blacklist = BlackList()
         self.image_free_pass = False
 
-        self.stored_job_ids = set()
+        self.checker = Checker()
 
     def put(self, job):
         if self.pass_filters(job):
@@ -388,8 +399,8 @@ class Store(Queue):
 
             job = Queue.get(self, True, 0.01)
 
-            if job.get_id() not in self.stored_job_ids:
-                self.stored_job_ids.add(job.get_id())
+            if not self.checker.check(job.get_id()):
+                self.checker.add(job.get_id())
                 return job
             else:
                 self.task_done()
