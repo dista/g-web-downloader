@@ -23,7 +23,7 @@ using corret filter you can download the reference perfectly -- see example belo
 
 ## Example
 
-* download \<\<programming in Lua\>\> online document
+* download \<\<programming in Lua\>\> online documents
 
 add following lines to main()
 
