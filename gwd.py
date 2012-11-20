@@ -19,7 +19,13 @@ import time
 #so i can search keyword debug to remove it
 def debug(msg):
     print msg
-
+    
+SAFELOCKER = threading.Lock()
+def safe_print(msg):
+    SAFELOCKER.acquire()
+    print msg
+    SAFELOCKER.release()
+    
 DATEFMT = "%Y-%m-%d %H:%M:%S"
 
 class Utility:
@@ -246,7 +252,7 @@ class Downloader:
                 bechmark_start = datetime.now()
                 c, c_t = self.get_content(job)
                 bechmark_end = datetime.now()
-                print "download %s, takes %s" % (link, bechmark_end - bechmark_start)
+                safe_print("download %s, takes %s" % (link, bechmark_end - bechmark_start))
 
                 if c_t in ['text/html', 'text/css']:
                     links = self.parser.parse(c, link, self.store.get_store_path())
@@ -271,16 +277,16 @@ class Downloader:
                     for lk in links:
                         self.store.put(Job(lk, link))
                 except IOError:
-                    print "can't write to %s" % localpath
+                    safe_print("can't write to %s" % localpath)
                 finally:
                     if f != None:
                         f.close()
             except URLError:
-                print "can't down load from %s" % link
+                safe_print("can't down load from %s" % link)
             except RememberFailedError, e:
                 raise e
             except Exception, e:
-                print "error happended %s" % e
+                safe_print("error happended %s" % e)
                 #traceback.print_exc()
                 continue
             finally:
@@ -311,7 +317,7 @@ class Downloader:
         if con_type in Downloader.white_lists:
             return (content, con_type)
         else:
-            print con_type
+            safe_print(con_type)
             return ("", con_type)
 
 class Filter:
@@ -452,7 +458,7 @@ class DH(threading.Thread):
         try:
             self.downloader.download()
         except Exception, e:
-            print e
+            safe_print(e)
             #traceback.print_exc()
             thread.exit()
 
@@ -519,7 +525,7 @@ class DHManager:
 
         self.join_th.start()
 
-        print "At %s, we are now downloading..." % (datetime.now().strftime(DATEFMT))
+        safe_print("At %s, we are now downloading..." % (datetime.now().strftime(DATEFMT)))
 
     def wait_for_all_exit(self):
         while True:
@@ -544,7 +550,7 @@ class DHManager:
         for dh in self.dhs:
             dh.kill()
 
-        print "%d thread need to be killed, please wait." % len(self.dhs)
+        safe_print("%d thread need to be killed, please wait." % len(self.dhs))
 
         while True:
             for dh in self.dhs:
@@ -556,15 +562,15 @@ class DHManager:
                 break
             time.sleep(0.0001)
         
-        print "done"
+        safe_print("done")
 
 def main():
     start_time = datetime.now()
-    download_path = '/root/lua-book'
+    download_path = 'lua-book'
     try:
         store = Store(download_path)
     except StoreError, e:
-        print e
+        safe_print(e)
         sys.exit(1)
 
     mem_inst = Memory(download_path)
@@ -594,7 +600,7 @@ def main():
             dh_manager.kill()
 
     end_time = datetime.now()
-    print("download finished, takes %s" % (end_time - start_time))
+    safe_print("download finished, takes %s" % (end_time - start_time))
         
 if __name__ == '__main__':
     main() 
