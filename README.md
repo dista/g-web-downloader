@@ -43,3 +43,8 @@ We apply these filters for the following reasons.
 1. the documents are under the path of www.lua.org/pil/
 1. we also need the image for pretty which may not be under www.lua.org/pil/
 1. lua.css is not under www.lua.org/pil, but we want that for displaying the index.html correctly
+
+## Next plan
+
+* We use python ```set``` to check if url has been downloaded, and it is stored in memory, so the more url we download,
+the larger memory will be used. An more advanced Checker need to be implemented
