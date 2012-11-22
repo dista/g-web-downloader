@@ -15,6 +15,9 @@ import thread
 from os import path
 from datetime import datetime
 import time
+import pickle
+
+import gc
 
 #so i can search keyword debug to remove it
 def debug(msg):
@@ -151,7 +154,7 @@ class Memory:
     provide an interface the remember the downloaded files. also we can query if the url has been downloaded from this class
     '''
     def __init__(self, memery_place):
-        self.memery_place = path.join(memery_place, ".mem")
+        self.memery_place = path.join(memery_place, ".gwd", "mem")
         if not path.isdir(self.memery_place):
             os.makedirs(self.memery_place)
     def remember(self, job, links):
@@ -369,15 +372,70 @@ class StoreError(Exception):
     pass
 
 class Checker:
-    def __init__(self):
+    MAX_POOL_SIZE = 1024 * 10
+    def __init__(self, checker_place):
+
+        self.checker_place = path.join(checker_place, ".gwd", "checker")
+        if not path.isdir(self.checker_place):
+            os.makedirs(self.checker_place)
+
+        self.mutex = threading.Lock()  
         self.pool = set()
+        self.second_pool = set()
+        self.cur_file_num = -1
+        self.file_base_name = "checker_file_"
     def add(self, v):
-        self.pool.add(v)
+        if self.check(v):
+            return
+
+        try:
+            self.mutex.acquire()
+
+            if len(self.pool) >= Checker.MAX_POOL_SIZE / len(v):
+                if len(self.second_pool) != 0:
+                    self.__dump_pool(self.second_pool)
+                    gc.collect()
+            
+                self.second_pool = self.pool
+                self.pool = set()
+
+            self.pool.add(v)
+        finally:
+            self.mutex.release()
+
     def check(self, v):
-        if v in self.pool:
-            return True
-        else:
+        try:
+            self.mutex.acquire()
+
+            if v in self.pool or v in self.second_pool:
+                return True
+            if self.cur_file_num == -1:
+                return False
+
+            for i in xrange(self.cur_file_num, -1, -1):
+                p = self.__load_pool(i)
+                if v in p:
+                    return True
+
             return False
+        finally:
+            self.mutex.release()
+
+    def __load_pool(self, num):
+        f = open(self.__get_file_path(num), 'r')
+        ret = pickle.load(f)
+        f.close()
+        return ret
+
+    def __dump_pool(self, p):
+        self.cur_file_num += 1
+
+        f = open(self.__get_file_path(self.cur_file_num), 'w')
+        pickle.dump(p, f, pickle.HIGHEST_PROTOCOL)
+        f.close()
+
+    def __get_file_path(self, num):
+        return path.join(self.checker_place, "%s%d" % (self.file_base_name, num))
 
 class Store(Queue):
     '''
@@ -390,7 +448,7 @@ class Store(Queue):
         self.blacklist = BlackList()
         self.image_free_pass = False
 
-        self.checker = Checker()
+        self.checker = Checker(store_path)
 
     def put(self, job):
         if self.pass_filters(job):
@@ -566,7 +624,7 @@ class DHManager:
 
 def main():
     start_time = datetime.now()
-    download_path = 'lua-book'
+    download_path = 'NET'
     try:
         store = Store(download_path)
     except StoreError, e:
@@ -575,11 +633,11 @@ def main():
 
     mem_inst = Memory(download_path)
 
-    #store.add_white_filter("\.163\.com",
-    #                "cache\.netease\.com",
-    #                "\.126\.net",
-    #                )
-    #store.put(Job("http://www.163.com"))
+    store.add_white_filter("\.163\.com",
+                    "cache\.netease\.com",
+                    "\.126\.net",
+                    )
+    store.put(Job("http://www.163.com"))
 
     #store.add_white_filter("docs\.python\.org")
     #store.add_black_filter("docs\.python\.org/download")
@@ -588,8 +646,8 @@ def main():
     #store.put(Job("http://docs.python.org"))
 
     #store.add_white_filter("\.cnbeta\.com", "{image}")
-    store.add_white_filter("www\.lua\.org\/pil\/", "{image}", "\.css")
-    store.put(Job("http://www.lua.org/pil/index.html"))
+    #store.add_white_filter("www\.lua\.org\/pil\/", "{image}", "\.css")
+    #store.put(Job("http://www.lua.org/pil/index.html"))
     
     dh_manager = None
     try:
