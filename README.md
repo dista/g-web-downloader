@@ -43,3 +43,8 @@ We apply these filters for the following reasons.
 1. the documents are under the path of www.lua.org/pil/
 1. we also need the image for pretty which may not be under www.lua.org/pil/
 1. lua.css is not under www.lua.org/pil, but we want that for displaying the index.html correctly
+
+## Extending & hack
+By default, we use `SaveFileProcesser` to save file to local disk, but you can also do other things: such
+as analyze html content and extract the info you care about. You can inherit `Processer` and replace 
+`Downloader.processer` to do so
