@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 from Queue import Queue, Empty
+from processer import *
 import urllib2
 from urllib2 import *
 import threading
@@ -203,7 +204,31 @@ class Memory:
 
     def get_memery_place(self, job):
         return path.join(self.memery_place, job.get_id())
-        
+
+class SaveFileProcesser(Processer):
+    def __init__(self, store):
+        self.store = store
+
+    def do_process(self, job, c_t, content):
+        localpath = Utility.get_local_path(job.get_referer(), job.get_link(), False)
+        localpath = os.path.join(self.store.get_store_path(), localpath) 
+
+        dir = os.path.dirname(localpath)
+        file_name = os.path.basename(localpath)
+
+        if not os.path.isdir(dir):
+            os.makedirs(dir, 0755)
+
+        try:
+            f = open(localpath, 'w+')
+            f.write(content)
+
+        except IOError:
+            safe_print("can't write to %s" % localpath)
+        finally:
+            if f != None:
+                f.close()
+
 class Downloader:
     '''
     contains the logic to download from an url
@@ -219,6 +244,8 @@ class Downloader:
         self.parser = Parser()
         self.mem_inst = mem_inst
         self.exit = False
+        self.processer = SaveFileProcesser(self.store)
+        #self.processer = ExtractBookProcesser()
 
     def kill(self):
         self.exit = True
@@ -262,28 +289,13 @@ class Downloader:
                     c = self.parser.get_changed_content()
                 else:
                     links = []
-                   
-                localpath = Utility.get_local_path(job.get_referer(), job.get_link(), False)
-                localpath = os.path.join(self.store.get_store_path(), localpath) 
 
-                dir = os.path.dirname(localpath)
-                file_name = os.path.basename(localpath)
+                self.processer.do_process(job, c_t, c);
 
-                if not os.path.isdir(dir):
-                    os.makedirs(dir, 0755)
+                self.mem_inst.remember(job, links)
+                for lk in links:
+                    self.store.put(Job(lk, link))
 
-                try:
-                    f = open(localpath, 'w+')
-                    f.write(c)
-
-                    self.mem_inst.remember(job, links)
-                    for lk in links:
-                        self.store.put(Job(lk, link))
-                except IOError:
-                    safe_print("can't write to %s" % localpath)
-                finally:
-                    if f != None:
-                        f.close()
             except URLError:
                 safe_print("can't down load from %s" % link)
             except RememberFailedError, e:
@@ -633,11 +645,16 @@ def main():
 
     mem_inst = Memory(download_path)
 
-    store.add_white_filter("\.163\.com",
-                    "cache\.netease\.com",
-                    "\.126\.net",
-                    )
-    store.put(Job("http://www.163.com"))
+    #store.add_white_filter("\.163\.com",
+    #                "cache\.netease\.com",
+    #                "\.126\.net",
+    #                )
+    #store.put(Job("http://www.163.com"))
+
+    store.add_white_filter("www\.biquge\.com\/0_82\/",
+            "\.css");
+
+    store.put(Job("http://www.biquge.com/0_82/"));
 
     #store.add_white_filter("docs\.python\.org")
     #store.add_black_filter("docs\.python\.org/download")
