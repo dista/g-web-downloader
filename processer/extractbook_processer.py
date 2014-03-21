@@ -2,6 +2,7 @@ from processer import Processer
 from HTMLParser import HTMLParser
 import sys
 import re
+from job import Job
 
 class ExtractBookProcesser(Processer, HTMLParser):
 
@@ -10,17 +11,48 @@ class ExtractBookProcesser(Processer, HTMLParser):
     def __init__(self):
         HTMLParser.__init__(self)
         self.rules = {}
-        self.rules['title'] = self.__create_rule('#maininfo #info h1', True)
-        self.rules['chapters'] = self.__create_rule('#list dd a', False)
+        self.rules['title'] = self.__create_rule('#maininfo #info h1', True, None)
+        self.rules['chapters'] = self.__create_rule('#list dd a', False, None)
+        self.rules['chapter_links'] = self.__create_rule('#list dd a', False, 'href')
+        self.rules['volume'] = self.__create_rule('#list dt', False, None)
+        self.rules['volume']['start_handler'] = self.__on_volume_start
+        self.chapter_got = False
 
         self.tags = []
 
-    def __create_rule(self, css, match_once):
+    def __on_html_finished(self, rules):
+        rule = rules['volume']
+        chapters_rule = rules['chapters']
+
+        if 'chapters' in rule and len(rule['chapters']) > 0:
+            last = rule['chapters'][-1]
+            if last['end'] == -1:
+                last['end'] = len(chapters_rule['content']) - 1
+
+    def __on_volume_start(self, rules):
+        rule = rules['volume']
+        chapters_rule = rules['chapters']
+        if not 'chapters' in rule:
+            rule['chapters'] = []
+
+        last = None
+        if len(rule['chapters']) > 0:
+            last = rule['chapters'][-1]
+
+        if last:
+            last['end'] = len(chapters_rule['content']) - 1
+
+        new_volume = {"start": len(chapters_rule['content']), "end": -1}
+
+        rule['chapters'].append(new_volume)
+
+    def __create_rule(self, css, match_once, attribute):
         ret = {
                 'css': css,
                 'idx':  -1,
                 'content': [],
-                'match_once': match_once
+                'match_once': match_once,
+                'attribute': attribute
               }
         ret['ids'] = self.__process_selector(ret['css'])
         return ret
@@ -52,6 +84,13 @@ class ExtractBookProcesser(Processer, HTMLParser):
 
         return False
 
+    def __get_attribute(self, attr, attrs):
+        for item in attrs:
+            if item[0] == attr:
+                return item[1]
+
+        return None
+
     def handle_starttag(self, tag, attrs):
         #print '%s<%s>' % (len(self.tags) * ' ', tag)
         self.tags.append([1, []])
@@ -66,6 +105,11 @@ class ExtractBookProcesser(Processer, HTMLParser):
                or (ri[0] == 'id' and self.is_id_in_attrs(ri[1], attrs)) \
                or (ri[0] == 'class' and self.is_class_in_attrs(ri[1], attrs)):
                 rule['idx'] += 1
+                if (len(rule['ids']) > 0) and (rule['idx'] == (len(rule['ids']) - 1)) \
+                    and rule['attribute']:
+                    rule['content'].append(self.__get_attribute(rule['attribute'], attrs))
+                    if rule['match_once']:
+                        rule['idx'] = -2
                 self.tags[-1][1].append(rule)
 
     def handle_endtag(self, tag):
@@ -83,12 +127,17 @@ class ExtractBookProcesser(Processer, HTMLParser):
 
         del self.tags[-1]    
 
+        if len(self.tags) == 0:
+            self.__on_html_finished(self.rules)
+
     def handle_data(self, data):
         for n in self.rules:
             rule = self.rules[n]
             #print rule
-            if (len(rule['ids']) > 0) and (rule['idx'] == (len(rule['ids']) - 1)):
-                print data
+            if (len(rule['ids']) > 0) and (rule['idx'] == (len(rule['ids']) - 1)) \
+                and not rule['attribute']:
+                if 'start_handler' in rule:
+                    rule['start_handler'](self.rules)
                 rule['content'].append(data)
                 if rule['match_once']:
                     rule['idx'] = -2
@@ -121,7 +170,48 @@ class ExtractBookProcesser(Processer, HTMLParser):
 
         self.feed(content);
         #print self.rules
-        sys.exit(0)
+        #print self.rules['chapters']
+
+        if not self.chapter_got:
+            if len(self.rules['chapter_links']['content']) > 0:
+                self.chapter_got = True
+            for i in xrange(len(self.rules['chapter_links']['content'])):
+                link = self.rules['chapter_links']['content'][i]
+                inner_job = Job(link, job.get_joined_link())
+                self.rules['chapter_links']['content'][i] = inner_job.get_joined_link()
+        else:
+            try:
+                pos = self.rules['chapter_links']['content'].index(job.get_joined_link())
+                print '@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@'
+            except ValueError:
+                pass
+
+'''
+from urllib2 import *
+import hashlib
+class Job:
+    def __init__(self, url, referer = None):
+        self.url = url
+        self.referer = referer
+
+    def get_link(self):
+        return self.url
+
+    def get_referer(self):
+        return self.referer
+
+    def get_joined_link(self):
+        if self.referer == None:
+            return self.url
+        else:
+            return urlparse.urljoin(self.referer, self.url)
+    
+    def get_id(self):
+        return hashlib.md5(re.sub(r"#.*$", "", self.get_joined_link())).hexdigest() 
+
+    def __str__(self):
+        return self.url
 
 p = ExtractBookProcesser();
-p.do_process({}, 'text/html', '');
+p.do_process(Job('http://www.biquge.com/0_82/', None), 'text/html', '');
+'''

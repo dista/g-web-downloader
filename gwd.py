@@ -17,6 +17,7 @@ from os import path
 from datetime import datetime
 import time
 import pickle
+from job import Job
 
 import gc
 
@@ -244,8 +245,8 @@ class Downloader:
         self.parser = Parser()
         self.mem_inst = mem_inst
         self.exit = False
-        self.processer = SaveFileProcesser(self.store)
-        #self.processer = ExtractBookProcesser()
+        #self.processer = SaveFileProcesser(self.store)
+        self.processer = ExtractBookProcesser()
 
     def kill(self):
         self.exit = True
@@ -535,33 +536,6 @@ class DH(threading.Thread):
     def kill(self):
         self.downloader.kill()
 
-
-class Job:
-    '''
-    job contains all the information downloader need to know to download
-    '''
-    def __init__(self, url, referer = None):
-        self.url = url
-        self.referer = referer
-
-    def get_link(self):
-        return self.url
-
-    def get_referer(self):
-        return self.referer
-
-    def get_joined_link(self):
-        if self.referer == None:
-            return self.url
-        else:
-            return urlparse.urljoin(self.referer, self.url)
-    
-    def get_id(self):
-        return hashlib.md5(re.sub(r"#.*$", "", self.get_joined_link())).hexdigest() 
-
-    def __str__(self):
-        return self.url
-
 class JoinThread(threading.Thread):
     def __init__(self, store):
         Thread.__init__(self)
@@ -571,7 +545,6 @@ class JoinThread(threading.Thread):
     def run(self):
         self.store.join()
         DHManager.all_is_done = True
-
 
 class DHManager:
     '''
