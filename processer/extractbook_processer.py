@@ -9,7 +9,8 @@ import json
 class ExtractBookProcesser(Processer, HTMLParser):
 
     content_encoding_regex = re.compile(r" charset=(\w+)")
-    website_rules = json.load(open('./website_rules.json', 'r'))
+    current_dir = os.path.dirname(os.path.realpath(__file__))
+    website_rules = json.load(open('%s/website_rules.json' % current_dir, 'r'))
 
     def __init__(self):
         HTMLParser.__init__(self)
