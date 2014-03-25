@@ -1,0 +1,10 @@
+{
+    "www.bxwx.org":
+    {
+        "title": "#title",
+        "chapters": ".TabCss dd a",
+        "chapter_links": ".TabCss dd a",
+        "volume": ".TabCss dt",
+        "content": "#content"
+    }
+}

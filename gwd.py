@@ -18,6 +18,8 @@ from datetime import datetime
 import time
 import pickle
 from job import Job
+import StringIO
+import gzip
 
 import gc
 
@@ -303,18 +305,24 @@ class Downloader:
                 raise e
             except Exception, e:
                 safe_print("error happended %s" % e)
-                #traceback.print_exc()
+                traceback.print_exc()
                 continue
             finally:
                 self.store.task_done()
+
+    def __ungzip(self, content):
+        cs = StringIO.StringIO(content)
+        gzipper = gzip.GzipFile(fileobj=cs)
+        return gzipper.read()
             
     def get_content(self, job):
         '''
         use urllib to download the file
         '''
         url = job.get_joined_link()
+        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 6.2; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/32.0.1667.0 Safari/537.36"}
 
-        request = Request(url)
+        request = Request(url, None, headers)
 
         fh = urllib2.urlopen(request)
         content = fh.read()
@@ -329,6 +337,10 @@ class Downloader:
                 con_type = ct.rstrip(';')
             else:   
                 con_type = ct
+
+        if ('Content-Encoding' in fh.headers) and (con_type == 'text/html'):
+            if fh.headers['Content-Encoding'] == 'gzip':
+                content = self.__ungzip(content)
 
         if con_type in Downloader.white_lists:
             return (content, con_type)
@@ -624,10 +636,10 @@ def main():
     #                )
     #store.put(Job("http://www.163.com"))
 
-    store.add_white_filter("www\.biquge\.com\/0_82\/",
+    store.add_white_filter("www\.bxwx\.org\/b\/30\/30172\/",
             "\.css");
 
-    store.put(Job("http://www.biquge.com/0_82/"));
+    store.put(Job("http://www.bxwx.org/b/30/30172/"));
 
     #store.add_white_filter("docs\.python\.org")
     #store.add_black_filter("docs\.python\.org/download")
