@@ -3,7 +3,7 @@ from HTMLParser import HTMLParser
 import sys
 import re
 import os
-#from job import Job
+from job import Job
 import json
 
 class ExtractBookProcesser(Processer, HTMLParser):
@@ -335,6 +335,7 @@ class ExtractBookProcesser(Processer, HTMLParser):
         else:
             self.__post_process_content(job, content)
 
+'''
 from urllib2 import *
 import hashlib
 class Job:
@@ -362,3 +363,4 @@ class Job:
 
 p = ExtractBookProcesser();
 p.do_process(Job('http://www.bxwx.org/0_82/', None), 'text/html', '');
+'''
