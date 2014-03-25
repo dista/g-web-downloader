@@ -3,7 +3,7 @@ from HTMLParser import HTMLParser
 import sys
 import re
 import os
-from job import Job
+#from job import Job
 import json
 
 class ExtractBookProcesser(Processer, HTMLParser):
@@ -16,11 +16,6 @@ class ExtractBookProcesser(Processer, HTMLParser):
         HTMLParser.__init__(self)
         self.rule_assigned = False
         self.rules = {}
-        #self.rules['title'] = self.__create_rule('#maininfo #info h1', True, None)
-        #self.rules['chapters'] = self.__create_rule('#list dd a', False, None)
-        #self.rules['chapter_links'] = self.__create_rule('#list dd a', False, 'href')
-        #self.rules['volume'] = self.__create_rule('#list dt', False, None)
-
         self.chapter_got = False
         self.last_tag = None
         self.root_dir = "/tmp/pp"
@@ -64,16 +59,37 @@ class ExtractBookProcesser(Processer, HTMLParser):
         ret['ids'] = self.__process_selector(ret['css'])
         return ret
 
+    def __process_sub_selector(self, sub_selectors, sub):
+        # http://dev.w3.org/csswg/selectors3/#nth-child-pseudo
+        # 2 -- a; 5 -- b, an+b
+        match = re.match(r'([\w-]+)\(((-?\d+)n)?(\+?)(\d+)?\)', sub.replace(' ', ''))
+        if not match:
+            raise Exception('bad n-child selector')
+        sel_name = match.group(1)
+        sub_selectors[sel_name] = []
+
+        for i in [2, 5]:
+            if match.group(i):
+                sub_selectors[sel_name].append(int(match.group(i)))
+            else:
+                sub_selectors[sel_name].append(match.group(i))
+        print sub_selectors
+
     def __process_selector(self, selector):
         tmp = selector.split(' ')
         processed = []
         for tc in tmp:
+            sub_selectors = {}
+            child_sel = None
+            if ':' in tc:
+                tc, child_sel = tc.split(':')
+                self.__process_sub_selector(sub_selectors, child_sel)
             if tc.startswith('#'):
-                processed.append(('id', tc[1:]))
+                processed.append(('id', tc[1:], sub_selectors))
             elif tc.startswith('.'):
-                processed.append(('class', tc[1:]))
+                processed.append(('class', tc[1:], sub_selectors))
             else:
-                processed.append(('tag', tc))
+                processed.append(('tag', tc, sub_selectors))
         return processed
 
     def is_id_in_attrs(self, m, attrs):
@@ -319,7 +335,6 @@ class ExtractBookProcesser(Processer, HTMLParser):
         else:
             self.__post_process_content(job, content)
 
-'''
 from urllib2 import *
 import hashlib
 class Job:
@@ -347,4 +362,3 @@ class Job:
 
 p = ExtractBookProcesser();
 p.do_process(Job('http://www.bxwx.org/0_82/', None), 'text/html', '');
-'''
