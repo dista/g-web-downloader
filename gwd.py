@@ -20,6 +20,7 @@ import pickle
 from job import Job
 import StringIO
 import gzip
+import signal
 
 import gc
 
@@ -661,6 +662,10 @@ def main():
 
     end_time = datetime.now()
     safe_print("download finished, takes %s" % (end_time - start_time))
+
+def on_sigint(signum, frame):
+    os._exit(signum)
         
 if __name__ == '__main__':
+    signal.signal(signal.SIGINT, on_sigint)
     main() 
