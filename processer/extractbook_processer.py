@@ -48,12 +48,11 @@ class ExtractBookProcesser(Processer, HTMLParser):
 
         rule['chapters'].append(new_volume)
 
-    def __create_rule(self, css, match_once, attribute):
+    def __create_rule(self, css, attribute):
         ret = {
                 'css': css,
                 'idx':  -1,
                 'content': [],
-                'match_once': match_once,
                 'attribute': attribute
               }
         ret['ids'] = self.__process_selector(ret['css'])
@@ -76,6 +75,13 @@ class ExtractBookProcesser(Processer, HTMLParser):
         print sub_selectors
 
     def __process_selector(self, selector):
+        '''
+            parse css selector, return a list.
+            list[0]: primal selector type, such as tag, id, class
+            list[1]: primal selector value
+            list[2]: optional secondary selectors. currently include: n-child
+        '''
+
         tmp = selector.split(' ')
         processed = []
         for tc in tmp:
@@ -85,11 +91,11 @@ class ExtractBookProcesser(Processer, HTMLParser):
                 tc, child_sel = tc.split(':')
                 self.__process_sub_selector(sub_selectors, child_sel)
             if tc.startswith('#'):
-                processed.append(('id', tc[1:], sub_selectors))
+                processed.append(['id', tc[1:], sub_selectors])
             elif tc.startswith('.'):
-                processed.append(('class', tc[1:], sub_selectors))
+                processed.append(['class', tc[1:], sub_selectors])
             else:
-                processed.append(('tag', tc, sub_selectors))
+                processed.append(['tag', tc, sub_selectors])
         return processed
 
     def is_id_in_attrs(self, m, attrs):
@@ -114,10 +120,48 @@ class ExtractBookProcesser(Processer, HTMLParser):
 
         return None
 
+    def __is_sub_selectors_match(self, sub_selectors):
+        if 'nth-child' not in sub_selectors:
+            a, b = sub_selectors['nth-child'][0], sub_selectors['nth-child'][1]
+            nth_child_parent = sub_selectors['nth_child_parent']
+            child_idx = nth_child_parent[2]['child_idx']
+
+            if b != None:
+                child_idx -= b
+            if a == None:
+                return (child_idx == 0)
+            else:
+                return (a * child_idx > 0) and (child_idx % a == 0)
+
+        return True
+
+    def __is_primal_selector_match(self, ri, tag, attrs):
+        if (ri[0] == 'tag' and tag == ri[1]) \
+           or (ri[0] == 'id' and self.is_id_in_attrs(ri[1], attrs)) \
+           or (ri[0] == 'class' and self.is_class_in_attrs(ri[1], attrs)):
+               return True
+        return False
+
+    def __is_selectors_match(self, ri, tag, attrs):
+        return self.__is_primal_selector_match(ri, tag, attrs) and \
+               self.__is_sub_selectors_match(ri[2])
+    
+    def __rule_has_child_selector(self, ids, idx, is_next):
+        if is_next:
+            idx += 1
+        if idx >= len(ids):
+            return False
+
+        ri = ids[idx]
+        if 'nth-child' in ri[2]:
+            return True
+
+        return False
+
     def handle_starttag(self, tag, attrs):
         self.last_tag = tag
         #print '%s<%s>' % (len(self.tags) * ' ', tag)
-        self.tags.append([1, []])
+        self.tags.append([1, [], {}])
         for n in self.rules:
             rule = self.rules[n]
             if rule['idx'] == -2:
@@ -125,16 +169,23 @@ class ExtractBookProcesser(Processer, HTMLParser):
             if (rule['idx'] + 1) >= len(rule['ids']):
                 continue
             ri = rule['ids'][rule['idx'] + 1]
-            if (ri[0] == 'tag' and tag == ri[1]) \
-               or (ri[0] == 'id' and self.is_id_in_attrs(ri[1], attrs)) \
-               or (ri[0] == 'class' and self.is_class_in_attrs(ri[1], attrs)):
+
+            # count parent children
+            if self.__is_primal_selector_match(ri, tag, attrs) and\
+               self.__rule_has_child_selector(rule['ids'], rule['idx'], True):
+                   ri[2]['nth_child_parent'][2]['child_idx'] += 1
+
+            if self.__is_selectors_match(ri, tag, attrs)
                 rule['idx'] += 1
                 if (len(rule['ids']) > 0) and (rule['idx'] == (len(rule['ids']) - 1)) \
                     and rule['attribute']:
                     rule['content'].append(self.__get_attribute(rule['attribute'], attrs))
-                    if rule['match_once']:
-                        rule['idx'] = -2
                 self.tags[-1][1].append(rule)
+                
+                if self.__rule_has_child_selector(rule['ids'], rule['idx'], True):
+                    self.tags[-1][2]['child_idx'] = 0
+                    rule['ids'][rule['idx'] + 1][2]['nth_child_parent'] = self.tags[-1]
+
 
     def handle_endtag(self, tag):
         #invalid tag
@@ -158,7 +209,7 @@ class ExtractBookProcesser(Processer, HTMLParser):
             self.__on_html_finished(self.rules)
 
     def handle_data(self, data):
-        print data
+        #print data
         for n in self.rules:
             rule = self.rules[n]
             #print rule
@@ -169,8 +220,6 @@ class ExtractBookProcesser(Processer, HTMLParser):
                 data = data.translate(None, '\r\n')
                 if len(data) > 0:
                     rule['content'].append(data)
-                if rule['match_once']:
-                    rule['idx'] = -2
 
     def get_content_encoding(self, content):
         match = ExtractBookProcesser.content_encoding_regex.search(content)
@@ -297,12 +346,12 @@ class ExtractBookProcesser(Processer, HTMLParser):
         if not rule:
             raise Exception('no rule found for job')
 
-        self.rules['title'] = self.__create_rule(rule['title'], True, None)
-        self.rules['chapters'] = self.__create_rule(rule['chapters'], False, None)
-        self.rules['chapter_links'] = self.__create_rule(rule['chapter_links'], False, 'href')
-        self.rules['volume'] = self.__create_rule(rule['volume'], False, None)
+        self.rules['title'] = self.__create_rule(rule['title'], None)
+        self.rules['chapters'] = self.__create_rule(rule['chapters'], None)
+        self.rules['chapter_links'] = self.__create_rule(rule['chapter_links'], 'href')
+        self.rules['volume'] = self.__create_rule(rule['volume'], None)
         self.rules['volume']['start_handler'] = self.__on_volume_start
-        self.rules['content'] = self.__create_rule(rule['content'], False, None) 
+        self.rules['content'] = self.__create_rule(rule['content'], None) 
 
     def do_process(self, job, c_t, content):
         if c_t not in ['text/html']:
