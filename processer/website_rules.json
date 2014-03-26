@@ -2,7 +2,7 @@
     "www.bxwx.org":
     {
         "title": "#title",
-        "chapters": ".TabCss dd a:nth-child(1)",
+        "chapters": ".TabCss dd a:nth-child(2n+1)",
         "chapter_links": ".TabCss dd a",
         "volume": ".TabCss dt",
         "content": "#content"

@@ -22,14 +22,18 @@ class ExtractBookProcesser(Processer, HTMLParser):
 
         self.tags = []
 
-    def __on_html_finished(self, rules):
-        rule = rules['volume']
-        chapters_rule = rules['chapters']
+    def __can_process_none_content_data(self):
+        return (not self.chapter_got)
 
-        if 'chapters' in rule and len(rule['chapters']) > 0:
-            last = rule['chapters'][-1]
-            if last['end'] == -1:
-                last['end'] = len(chapters_rule['content']) - 1
+    def __on_html_finished(self, rules):
+        if self.__can_process_none_content_data():
+            rule = rules['volume']
+            chapters_rule = rules['chapters']
+
+            if 'chapters' in rule and len(rule['chapters']) > 0:
+                last = rule['chapters'][-1]
+                if last['end'] == -1:
+                    last['end'] = len(chapters_rule['content']) - 1
 
     def __on_volume_start(self, rules):
         rule = rules['volume']
@@ -58,7 +62,11 @@ class ExtractBookProcesser(Processer, HTMLParser):
         ret['ids'] = self.__process_selector(ret['css'])
         return ret
 
-    def __process_sub_selector(self, sub_selectors, sub):
+    def __rebuild_ids(self):
+        for rule_name in self.rules:
+            self.rules[rule_name]['ids'] = self.__process_selector(self.rules[rule_name]['css']) 
+
+    def __process_nth_child_selector(self, sub_selectors, sub):
         # http://dev.w3.org/csswg/selectors3/#nth-child-pseudo
         # 2 -- a; 5 -- b, an+b
         match = re.match(r'([\w-]+)\(((-?\d+)n)?(\+?)(\d+)?\)', sub.replace(' ', ''))
@@ -67,16 +75,20 @@ class ExtractBookProcesser(Processer, HTMLParser):
         sel_name = match.group(1)
         sub_selectors[sel_name] = []
 
-        for i in [2, 5]:
+        for i in [3, 5]:
             if match.group(i):
                 sub_selectors[sel_name].append(int(match.group(i)))
             else:
                 sub_selectors[sel_name].append(match.group(i))
-        print sub_selectors
+
+    def __process_attribute_selector(self, sub_selectors, sub):
+        m = re.match(r'(\w+)([~|]?)(=?)"?([:/.\w#-]*)"?', sub)
+        sub_selectors['attribute'] = m.groups() 
 
     def __process_selector(self, selector):
         '''
-            parse css selector, return a list.
+            parse css selector, return a list of list.
+            each list contains:
             list[0]: primal selector type, such as tag, id, class
             list[1]: primal selector value
             list[2]: optional secondary selectors. currently include: n-child
@@ -89,7 +101,14 @@ class ExtractBookProcesser(Processer, HTMLParser):
             child_sel = None
             if ':' in tc:
                 tc, child_sel = tc.split(':')
-                self.__process_sub_selector(sub_selectors, child_sel)
+                self.__process_nth_child_selector(sub_selectors, child_sel)
+            elif '[' in tc:
+                s_pos1 = tc.index('[')
+                s_pos2 = tc.index(']')
+                tmp = tc[0:s_pos1]
+                child_sel = tc[s_pos1+1:s_pos2]
+                tc = tmp
+                self.__process_attribute_selector(sub_selectors, child_sel)
             if tc.startswith('#'):
                 processed.append(['id', tc[1:], sub_selectors])
             elif tc.startswith('.'):
@@ -120,8 +139,8 @@ class ExtractBookProcesser(Processer, HTMLParser):
 
         return None
 
-    def __is_sub_selectors_match(self, sub_selectors):
-        if 'nth-child' not in sub_selectors:
+    def __is_sub_selectors_match(self, sub_selectors, attrs):
+        if 'nth-child' in sub_selectors:
             a, b = sub_selectors['nth-child'][0], sub_selectors['nth-child'][1]
             nth_child_parent = sub_selectors['nth_child_parent']
             child_idx = nth_child_parent[2]['child_idx']
@@ -131,7 +150,20 @@ class ExtractBookProcesser(Processer, HTMLParser):
             if a == None:
                 return (child_idx == 0)
             else:
-                return (a * child_idx > 0) and (child_idx % a == 0)
+                return (a * child_idx >= 0) and (child_idx % a == 0)
+        elif 'attribute' in sub_selectors:
+            for attr in attrs:
+                attr_item = sub_selectors['attribute']
+                if attr[0] == attr_item[0]:
+                    if attr_item[2] == '':
+                        return True
+                    elif attr_item[1] == '~':
+                        return (attr_item[3] in attr[1].split(' '))
+                    elif attr_item[1] == '|':
+                        tmp = attr[1].split('-')
+                        return (len(tmp) > 1 and attr_item[3] == tmp[0])
+                    else:
+                        return attr_item[3] == attr[1]
 
         return True
 
@@ -144,7 +176,7 @@ class ExtractBookProcesser(Processer, HTMLParser):
 
     def __is_selectors_match(self, ri, tag, attrs):
         return self.__is_primal_selector_match(ri, tag, attrs) and \
-               self.__is_sub_selectors_match(ri[2])
+               self.__is_sub_selectors_match(ri[2], attrs)
     
     def __rule_has_child_selector(self, ids, idx, is_next):
         if is_next:
@@ -164,8 +196,6 @@ class ExtractBookProcesser(Processer, HTMLParser):
         self.tags.append([1, [], {}])
         for n in self.rules:
             rule = self.rules[n]
-            if rule['idx'] == -2:
-                continue
             if (rule['idx'] + 1) >= len(rule['ids']):
                 continue
             ri = rule['ids'][rule['idx'] + 1]
@@ -175,11 +205,12 @@ class ExtractBookProcesser(Processer, HTMLParser):
                self.__rule_has_child_selector(rule['ids'], rule['idx'], True):
                    ri[2]['nth_child_parent'][2]['child_idx'] += 1
 
-            if self.__is_selectors_match(ri, tag, attrs)
+            if self.__is_selectors_match(ri, tag, attrs):
                 rule['idx'] += 1
                 if (len(rule['ids']) > 0) and (rule['idx'] == (len(rule['ids']) - 1)) \
                     and rule['attribute']:
-                    rule['content'].append(self.__get_attribute(rule['attribute'], attrs))
+                    if n == 'content' or self.__can_process_none_content_data():
+                        rule['content'].append(self.__get_attribute(rule['attribute'], attrs))
                 self.tags[-1][1].append(rule)
                 
                 if self.__rule_has_child_selector(rule['ids'], rule['idx'], True):
@@ -200,8 +231,7 @@ class ExtractBookProcesser(Processer, HTMLParser):
             return
 
         for rule in tag[1]:
-            if rule['idx'] != -2:
-                rule['idx'] -= 1
+            rule['idx'] -= 1
 
         del self.tags[-1]    
 
@@ -218,7 +248,7 @@ class ExtractBookProcesser(Processer, HTMLParser):
                 if 'start_handler' in rule:
                     rule['start_handler'](self.rules)
                 data = data.translate(None, '\r\n')
-                if len(data) > 0:
+                if len(data) > 0 and (n == 'content' or self.__can_process_none_content_data()):
                     rule['content'].append(data)
 
     def get_content_encoding(self, content):
@@ -330,11 +360,17 @@ class ExtractBookProcesser(Processer, HTMLParser):
     def __get_sync_data_file_path(self):
         return '%s/%s' % (self.root_dir, 'sync.json')
 
+    def __clean_process_tmp_data(self):
+        for rule_name in self.rules:
+            self.rules[rule_name]['idx'] = -1
+            for selectors in self.rules[rule_name]['ids']:
+                selectors[2] = {}
+
     def __write_sync_data(self):
         sync_data_file = open(self.__get_sync_data_file_path(), 'w+')
         # FIXME
         self.rules['volume']['start_handler'] = None
-        json.dump(self.rules, sync_data_file)
+        json.dump(self.rules, sync_data_file, indent=True)
         sync_data_file.close()
 
     def __assign_rule(self, job):
@@ -360,15 +396,18 @@ class ExtractBookProcesser(Processer, HTMLParser):
         if not self.rule_assigned:
             self.__assign_rule(job)
             self.rule_assigned = True
+        else:
+            self.rules['content'] = self.__create_rule(rule['content'], None) 
 
         if os.path.isfile(self.__get_sync_data_file_path()):
             self.chapter_got = True
             self.rules = json.load(open(self.__get_sync_data_file_path()))
+            self.__rebuild_ids()
             self.rules['volume']['start_handler'] = self.__on_volume_start
 
         content = self.content2UTF8(content)
         #open("/tmp/xxx", "w+").write(content)
-        #sys.exit(1)
+        #os._exit(1)
 
         #self.rules['content'] = self.__create_rule('#content', False, None) 
         #content = open("/tmp/xxx", "r").read();
@@ -376,7 +415,12 @@ class ExtractBookProcesser(Processer, HTMLParser):
 
         self.feed(content);
         #print self.rules
-        #print self.rules['chapters']
+
+        self.__clean_process_tmp_data()
+
+        #for itm in self.rules['chapter_links']['content']:
+        #    print itm
+        #print len(self.rules['chapters']['content'])
 
         if not self.chapter_got:
             self.__post_process_volumes(job)
