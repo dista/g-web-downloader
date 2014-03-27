@@ -1,0 +1,22 @@
+def repos(t, total):
+    m = t % 4
+    tm = total % 4
+
+    if tm == 0 or (t < total - tm):
+        if m == 0:
+            return t + 3
+        elif m == 1:
+            return t - 1
+        elif m == 2:
+            return t
+        else:
+            return t - 2
+    elif tm == 3:
+        if m == 0:
+            return t
+        elif m == 1:
+            return t + 1
+        elif m == 2:
+            return t - 1
+    else:
+        return t

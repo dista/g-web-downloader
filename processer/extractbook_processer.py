@@ -34,8 +34,12 @@ from job import Job
 import json
 
 class ExtractBookProcesser(Processer, HTMLParser):
+    '''
+    supported css: .class, #id, tag, nth-child, attribute
+    '''
 
     content_encoding_regex = re.compile(r" charset=(\w+)")
+    rule_css_regex = re.compile(r"(.+)/(\w+)$")
     current_dir = os.path.dirname(os.path.realpath(__file__))
     website_rules = json.load(open('%s/website_rules.json' % current_dir, 'r'))
 
@@ -44,7 +48,7 @@ class ExtractBookProcesser(Processer, HTMLParser):
         self.rule_assigned = False
         self.rules = {}
         self.chapter_got = False
-        self.last_tag = None
+        self.website_rule = None
         self.root_dir = "/tmp/pp"
 
         self.tags = []
@@ -79,7 +83,13 @@ class ExtractBookProcesser(Processer, HTMLParser):
 
         rule['chapters'].append(new_volume)
 
-    def __create_rule(self, css, attribute):
+    def __create_rule(self, css):
+        m = ExtractBookProcesser.rule_css_regex.match(css) 
+        attribute = None
+        if m:
+            css = m.group(1)
+            attribute = m.group(2)
+
         ret = {
                 'css': css,
                 'idx':  -1,
@@ -218,9 +228,8 @@ class ExtractBookProcesser(Processer, HTMLParser):
         return False
 
     def handle_starttag(self, tag, attrs):
-        self.last_tag = tag
         #print '%s<%s>' % (len(self.tags) * ' ', tag)
-        self.tags.append([1, [], {}])
+        self.tags.append([1, [], {}, tag])
         for n in self.rules:
             rule = self.rules[n]
             if (rule['idx'] + 1) >= len(rule['ids']):
@@ -245,12 +254,11 @@ class ExtractBookProcesser(Processer, HTMLParser):
                     rule['ids'][rule['idx'] + 1][2]['nth_child_parent'] = self.tags[-1]
 
 
-    def handle_endtag(self, tag):
+    def handle_endtag(self, cur_tag):
         #invalid tag
-        if tag != self.last_tag:
-            return
-        #print '%s</%s>' % ((len(self.tags) - 1) * ' ', tag)
         tag = self.tags[-1]
+        if tag[3] != cur_tag:
+            return
         #print tag
         tag[0] -= 1
 
@@ -260,8 +268,10 @@ class ExtractBookProcesser(Processer, HTMLParser):
         for rule in tag[1]:
             rule['idx'] -= 1
 
-        del self.tags[-1]    
+        #print "$$$$$$%d" % len(self.tags)
+        self.tags.pop()
 
+        #print len(self.tags)
         if len(self.tags) == 0:
             self.__on_html_finished(self.rules)
 
@@ -301,23 +311,44 @@ class ExtractBookProcesser(Processer, HTMLParser):
             inner_job = Job(link, job.get_joined_link())
             self.rules['chapter_links']['content'][i] = inner_job.get_joined_link()
 
+        self.__write_title_author()
         self.__write_catalog()
+
+    def __write_title_author(self):
+        f = open(self.root_dir + '/' + "title_author" , 'w+')
+
+        if len(self.rules['title']['content']) > 0:
+            f.write(self.rules['title']['content'][0])
+
+        f.write('/')
+
+        if len(self.rules['author']['content']) > 0:
+            f.write(self.rules['author']['content'][0])
+
+        f.close()
 
     def __write_catalog(self):
         volume_index = 0
-        write_chapters = []
+        #write_chapters = []
         cc = self.rules['chapters']['content']
         cl = self.rules['chapter_links']['content']
 
         f = open(self.root_dir + '/' + 'catelog', 'w+')
         volume_chapters = []
         vc_len = len(self.rules['volume']['content'])
+        if 'repos' in self.website_rule and 'chapters' in self.website_rule['repos']:
+            exec(open(ExtractBookProcesser.current_dir + "/" + self.website_rule['repos']['chapters']).read())
+        repos_chapters = []
+        repos_chapter_links = []
         for volume in self.rules['volume']['content']:
             #if volume_index == 0:
             #    volume_index += 1
             #    continue
 
             f.write(volume + '\n')
+
+            pending_chapters = []
+            chapter_idx = 0
             
             if not os.path.isdir("%s/%s" % (self.root_dir, volume)):
                 os.mkdir("%s/%s" % (self.root_dir, volume))
@@ -325,10 +356,33 @@ class ExtractBookProcesser(Processer, HTMLParser):
             chapters = self.rules['volume']['chapters'][volume_index]
 
             volume_chapters = []
-            for i in xrange(chapters['start'], chapters['end']):
-                if not cc[i] in write_chapters:
-                    write_chapters.append(cc[i])
+            volume_chapter_count = chapters['end'] - chapters['start'] + 1
+            for i in xrange(chapters['start'], chapters['end'] + 1):
+                in_volume_idx = i - chapters['start']
+                in_volume_repos_idx = in_volume_idx
+                if repos:
+                    in_volume_repos_idx = repos(in_volume_idx, volume_chapter_count)
+                if in_volume_repos_idx == chapter_idx:
                     volume_chapters.append(cc[i])
+                    repos_chapters.append(cc[i])
+                    repos_chapter_links.append(cl[i])
+                    chapter_idx += 1
+                else:
+                    pending_chapters.append((i, in_volume_repos_idx))
+                    for pci in xrange(len(pending_chapters)):
+                        pc = pending_chapters[pci] 
+                        if pc[1] == chapter_idx:
+                            volume_chapters.append(cc[pc[0]])
+                            repos_chapters.append(cc[pc[0]])
+                            repos_chapter_links.append(cl[pc[0]])
+                            chapter_idx += 1
+                            del pending_chapters[pci]
+                            break
+            pending_chapters.sort(key = lambda tup: tup[1])
+            for pc in pending_chapters:
+                volume_chapters.append(cc[pc[0]])
+                repos_chapters.append(cc[pc[0]])
+                repos_chapter_links.append(cl[pc[0]])
 
             #if volume_index != (vc_len - 1):
             #    f.write("%d\n" % len(volume_chapters))
@@ -338,6 +392,10 @@ class ExtractBookProcesser(Processer, HTMLParser):
             for c in volume_chapters:
                 f.write("%s\n" % c)
             volume_index += 1
+
+        if repos:
+            self.rules['chapters']['content'] = repos_chapters
+            self.rules['chapter_links']['content'] = repos_chapter_links
         
         '''
         if volume_index != 0:
@@ -405,16 +463,18 @@ class ExtractBookProcesser(Processer, HTMLParser):
         for website in ExtractBookProcesser.website_rules:
             if website in job.get_joined_link():
                 rule = ExtractBookProcesser.website_rules[website]
+                self.website_rule = rule
                 break
         if not rule:
             raise Exception('no rule found for job')
 
-        self.rules['title'] = self.__create_rule(rule['title'], None)
-        self.rules['chapters'] = self.__create_rule(rule['chapters'], None)
-        self.rules['chapter_links'] = self.__create_rule(rule['chapter_links'], 'href')
-        self.rules['volume'] = self.__create_rule(rule['volume'], None)
+        self.rules['title'] = self.__create_rule(rule['title'])
+        self.rules['author'] = self.__create_rule(rule['author'])
+        self.rules['chapters'] = self.__create_rule(rule['chapters'])
+        self.rules['chapter_links'] = self.__create_rule(rule['chapter_links'])
+        self.rules['volume'] = self.__create_rule(rule['volume'])
         self.rules['volume']['start_handler'] = self.__on_volume_start
-        self.rules['content'] = self.__create_rule(rule['content'], None) 
+        self.rules['content'] = self.__create_rule(rule['content']) 
 
     def do_process(self, job, c_t, content):
         if c_t not in ['text/html']:
@@ -423,8 +483,6 @@ class ExtractBookProcesser(Processer, HTMLParser):
         if not self.rule_assigned:
             self.__assign_rule(job)
             self.rule_assigned = True
-        else:
-            self.rules['content'] = self.__create_rule(rule['content'], None) 
 
         if os.path.isfile(self.__get_sync_data_file_path()):
             self.chapter_got = True
@@ -445,7 +503,7 @@ class ExtractBookProcesser(Processer, HTMLParser):
 
         self.__clean_process_tmp_data()
 
-        #for itm in self.rules['chapter_links']['content']:
+        #for itm in self.rules['chapters']['content']:
         #    print itm
         #print len(self.rules['chapters']['content'])
 

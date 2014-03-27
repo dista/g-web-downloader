@@ -1,10 +1,14 @@
 {
     "www.bxwx.org":
     {
-        "title": "#title",
-        "chapters": ".TabCss dd a:nth-child(2n+1)",
-        "chapter_links": ".TabCss dd a",
+        "title": ".roadl a:nth-child(3)",
+        "author": "#info a:nth-child(1)",
+        "chapters": ".TabCss dd a",
+        "chapter_links": ".TabCss dd a/href",
         "volume": ".TabCss dt",
-        "content": "#content"
+        "content": "#content",
+        "repos": {
+            "chapters": "repos/www_bxwx_org"
+        }
     }
 }
