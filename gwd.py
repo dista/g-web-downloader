@@ -276,7 +276,7 @@ class Downloader:
         self.mem_inst = mem_inst
         self.exit = False
         #self.processer = SaveFileProcesser(self.store)
-        self.processer = ExtractBookProcesser()
+        self.processer = ExtractBookProcesser(self.store.get_store_path() + "/__book__")
 
     def kill(self):
         self.exit = True
@@ -664,10 +664,10 @@ def main():
     #                )
     #store.put(Job("http://www.163.com"))
 
-    store.add_white_filter("www\.bxwx\.org\/b\/30\/30172\/",
+    store.add_white_filter("www\.bxwx\.org\/b\/59\/59047\/",
             "\.css");
 
-    store.put(Job("http://www.bxwx.org/b/30/30172/"));
+    store.put(Job("http://www.bxwx.org/b/59/59047/index.html"));
 
     #store.add_white_filter("docs\.python\.org")
     #store.add_black_filter("docs\.python\.org/download")

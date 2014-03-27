@@ -43,13 +43,16 @@ class ExtractBookProcesser(Processer, HTMLParser):
     current_dir = os.path.dirname(os.path.realpath(__file__))
     website_rules = json.load(open('%s/website_rules.json' % current_dir, 'r'))
 
-    def __init__(self):
+    def __init__(self, root_dir):
         HTMLParser.__init__(self)
         self.rule_assigned = False
         self.rules = {}
         self.chapter_got = False
         self.website_rule = None
-        self.root_dir = "/tmp/pp"
+        self.root_dir = root_dir
+
+        if not os.path.isdir(self.root_dir):
+            os.makedirs(self.root_dir)
 
         self.tags = []
 
