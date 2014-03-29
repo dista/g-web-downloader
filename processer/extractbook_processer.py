@@ -302,7 +302,7 @@ class ExtractBookProcesser(Processer, HTMLParser):
     def content2UTF8(self, content):
         charset = self.get_content_encoding(content)
         if charset != "UTF-8":
-            content = content.decode(charset).encode('UTF-8')
+            content = content.decode(charset, 'ignore').encode('UTF-8')
 
         return content
 
@@ -493,8 +493,9 @@ class ExtractBookProcesser(Processer, HTMLParser):
             self.__rebuild_ids()
             self.rules['volume']['start_handler'] = self.__on_volume_start
 
+        open("/tmp/MMM", "w+").write(content)
+
         content = self.content2UTF8(content)
-        #open("/tmp/xxx", "w+").write(content)
         #os._exit(1)
 
         #self.rules['content'] = self.__create_rule('#content', False, None) 
