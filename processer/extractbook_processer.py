@@ -493,8 +493,7 @@ class ExtractBookProcesser(Processer, HTMLParser):
             self.__rebuild_ids()
             self.rules['volume']['start_handler'] = self.__on_volume_start
 
-        open("/tmp/MMM", "w+").write(content)
-
+        #open("/tmp/MMM", "w+").write(content)
         content = self.content2UTF8(content)
         #os._exit(1)
 
