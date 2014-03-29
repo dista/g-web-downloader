@@ -327,13 +327,16 @@ class Downloader:
                 for lk in links:
                     self.store.put(Job(lk, link))
 
-            except URLError:
+            except URLError, e:
                 safe_print("can't down load from %s" % link)
+                if e.errno == 110:
+                    self.store.put(Job(link, link))
             except RememberFailedError, e:
                 raise e
             except Exception, e:
                 safe_print("error happended %s" % e)
                 traceback.print_exc()
+                os._exit(0)
                 continue
             finally:
                 self.store.task_done()
@@ -352,7 +355,7 @@ class Downloader:
 
         request = Request(url, None, headers)
 
-        fh = urllib2.urlopen(request)
+        fh = urllib2.urlopen(request, timeout = 30)
         content = fh.read()
 
         ct = fh.headers['Content-Type']
