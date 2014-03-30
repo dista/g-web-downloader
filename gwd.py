@@ -289,6 +289,7 @@ class Downloader:
             try:
                 job = self.store.get()
             except Empty, e:
+                time.sleep(1) 
                 continue
 
             #print job
@@ -326,18 +327,29 @@ class Downloader:
                 self.mem_inst.remember(job, links)
                 for lk in links:
                     self.store.put(Job(lk, link))
+                
+                self.store.mark_as_done(job)
 
             except URLError, e:
-                safe_print("can't down load from %s" % link)
-                if e.errno == 110:
-                    self.store.put(Job(link, link))
+                safe_print("can't down load from %s %s" % (link, e))
+                
+                if job.get_retry_times() < 20:
+                    new_job = Job(link, link, job.get_retry_times() + 1) 
+                    self.store.put(new_job)
+                else:
+                    safe_print("exceed 20 retry times")
+                    os._exit(1)
             except RememberFailedError, e:
                 raise e
             except Exception, e:
+                if str(e) == "timed out" and job.get_retry_times() < 100:
+                    self.store.put(Job(link, link))
+                else:
+                    safe_print("exceed 100 retry times")
+                    os._exit(1)
                 safe_print("error happended %s" % e)
-                traceback.print_exc()
-                os._exit(0)
-                continue
+                #traceback.print_exc()
+                #continue
             finally:
                 self.store.task_done()
 
@@ -520,10 +532,12 @@ class Store(Queue):
             job = Queue.get(self, True, 0.01)
 
             if not self.checker.check(job.get_id()):
-                self.checker.add(job.get_id())
                 return job
             else:
                 self.task_done()
+
+    def mark_as_done(self, job):
+        self.checker.add(job.get_id())
 
     def get_store_path(self):
         return self.store_path
@@ -652,7 +666,7 @@ class DHManager:
 
 def main():
     start_time = datetime.now()
-    download_path = 'NET'
+    download_path = 'dzz'
     try:
         store = Store(download_path)
     except StoreError, e:
@@ -667,10 +681,10 @@ def main():
     #                )
     #store.put(Job("http://www.163.com"))
 
-    store.add_white_filter("www\.bxwx\.org\/b\/59\/59047\/",
+    store.add_white_filter("www\.bxwx\.org\/b\/62\/62724\/",
             "\.css");
 
-    store.put(Job("http://www.bxwx.org/b/59/59047/index.html"));
+    store.put(Job("http://www.bxwx.org/b/62/62724/index.html"));
 
     #store.add_white_filter("docs\.python\.org")
     #store.add_black_filter("docs\.python\.org/download")

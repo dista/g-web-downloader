@@ -112,8 +112,8 @@ def build(source_dir, dst_dir):
     volume_file.close()
 
 if __name__ == "__main__":
-    source_dir = "/tmp/pp"
-    dst_dir = "/tmp/fkk"
+    source_dir = "../dzz/__book__"
+    dst_dir = "/tmp/dzz"
 
     build(source_dir, dst_dir)
     

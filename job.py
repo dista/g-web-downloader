@@ -33,9 +33,13 @@ class Job:
     '''
     job contains all the information downloader need to know to download
     '''
-    def __init__(self, url, referer = None):
+    def __init__(self, url, referer = None, retry_times = 0):
         self.url = url
         self.referer = referer
+        self.retry_times = retry_times
+
+    def get_retry_times(self):
+        return self.retry_times
 
     def get_link(self):
         return self.url

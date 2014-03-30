@@ -330,11 +330,17 @@ class ExtractBookProcesser(Processer, HTMLParser):
 
         f.close()
 
+    def __normalize_chapters(self, cc):
+        for i in xrange(len(cc)):
+            cc[i] = cc[i].strip('/')
+
     def __write_catalog(self):
         volume_index = 0
         #write_chapters = []
         cc = self.rules['chapters']['content']
         cl = self.rules['chapter_links']['content']
+
+        self.__normalize_chapters(cc)
 
         f = open(self.root_dir + '/' + 'catelog', 'w+')
         volume_chapters = []
