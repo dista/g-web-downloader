@@ -371,7 +371,7 @@ class Downloader:
 
         request = Request(url, None, headers)
 
-        fh = urllib2.urlopen(request, timeout = 30)
+        fh = urllib2.urlopen(request, timeout = 60 * 2)
         content = fh.read()
 
         ct = fh.headers['Content-Type']
@@ -670,7 +670,7 @@ class DHManager:
 
 def main():
     start_time = datetime.now()
-    download_path = 'iOS_Library'
+    download_path = '../iOS_Library'
     try:
         store = Store(download_path)
     except StoreError, e:
@@ -701,7 +701,7 @@ def main():
     #store.put(Job("http://www.lua.org/pil/index.html"))
 
     store.add_black_filter("\.pdf")
-    store.add_white_filter("developer\.apple\.com\/library\/ios", "{image}", "\.css")
+    store.add_white_filter("developer\.apple\.com\/library\/ios", "{image}", "\.css", "\.js")
     store.put(Job("https://developer.apple.com/library/ios/documentation/LanguagesUtilities/Conceptual/iTunesConnect_Guide/Chapters/About.html#//apple_ref/doc/uid/TP40011225"))
 
     dh_manager = None
