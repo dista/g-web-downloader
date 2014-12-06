@@ -51,6 +51,10 @@ import signal
 
 import gc
 
+# for trace memory
+#from guppy import hpy
+#hp = hpy()
+
 #so i can search keyword debug to remove it
 def debug(msg):
     print msg
@@ -167,7 +171,7 @@ class Parser:
             ps_ret = urlparse.urlparse(link)
             t = urlparse.urlparse(urlparse.urljoin(self.url, link))
 
-            if t.scheme == 'http':
+            if t.scheme == 'http' or t.scheme == 'https':
                 new_full = full.replace(link, "%s#%s" % (Utility.get_local_path(self.url, link), ps_ret.fragment))
                 self.content = self.content.replace(full, new_full) 
                 links.append(link)
@@ -275,8 +279,8 @@ class Downloader:
         self.parser = Parser()
         self.mem_inst = mem_inst
         self.exit = False
-        #self.processer = SaveFileProcesser(self.store)
-        self.processer = ExtractBookProcesser(self.store.get_store_path() + "/__book__")
+        self.processer = SaveFileProcesser(self.store)
+        #self.processer = ExtractBookProcesser(self.store.get_store_path() + "/__book__")
 
     def kill(self):
         self.exit = True
@@ -338,7 +342,7 @@ class Downloader:
                     self.store.put(new_job)
                 else:
                     safe_print("exceed 20 retry times")
-                    os._exit(1)
+                    #os._exit(1)
             except RememberFailedError, e:
                 raise e
             except Exception, e:
@@ -346,7 +350,7 @@ class Downloader:
                     self.store.put(Job(link, link))
                 else:
                     safe_print("exceed 100 retry times")
-                    os._exit(1)
+                    #os._exit(1)
                 safe_print("error happended %s" % e)
                 #traceback.print_exc()
                 #continue
@@ -666,7 +670,7 @@ class DHManager:
 
 def main():
     start_time = datetime.now()
-    download_path = 'dzz'
+    download_path = 'iOS_Library'
     try:
         store = Store(download_path)
     except StoreError, e:
@@ -684,7 +688,7 @@ def main():
     store.add_white_filter("www\.bxwx\.org\/b\/62\/62724\/",
             "\.css");
 
-    store.put(Job("http://www.bxwx.org/b/62/62724/index.html"));
+    #store.put(Job("http://www.bxwx.org/b/62/62724/index.html"));
 
     #store.add_white_filter("docs\.python\.org")
     #store.add_black_filter("docs\.python\.org/download")
@@ -695,7 +699,11 @@ def main():
     #store.add_white_filter("\.cnbeta\.com", "{image}")
     #store.add_white_filter("www\.lua\.org\/pil\/", "{image}", "\.css")
     #store.put(Job("http://www.lua.org/pil/index.html"))
-    
+
+    store.add_black_filter("\.pdf")
+    store.add_white_filter("developer\.apple\.com\/library\/ios", "{image}", "\.css")
+    store.put(Job("https://developer.apple.com/library/ios/documentation/LanguagesUtilities/Conceptual/iTunesConnect_Guide/Chapters/About.html#//apple_ref/doc/uid/TP40011225"))
+
     dh_manager = None
     try:
         dh_manager = DHManager(store, mem_inst, 30)
@@ -708,6 +716,8 @@ def main():
     safe_print("download finished, takes %s" % (end_time - start_time))
 
 def on_sigint(signum, frame):
+    #after = hp.heap()
+    #print after
     os._exit(signum)
         
 if __name__ == '__main__':
