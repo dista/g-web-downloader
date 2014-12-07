@@ -340,11 +340,13 @@ class Downloader:
             except URLError, e:
                 safe_print("can't down load from %s %s" % (link, e))
                 
-                if job.get_retry_times() < 20:
+                if job.get_retry_times() < 10:
                     new_job = Job(link, link, job.get_retry_times() + 1) 
                     self.store.put(new_job)
                 else:
-                    safe_print("exceed 20 retry times")
+                    self.mem_inst.remember(job, links)
+                    self.store.mark_as_done(job)
+                    safe_print("exceed 10 retry times")
                     #os._exit(1)
             except RememberFailedError, e:
                 raise e
