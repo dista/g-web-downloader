@@ -371,7 +371,7 @@ class Downloader:
 
         request = Request(url, None, headers)
 
-        fh = urllib2.urlopen(request, timeout = 30)
+        fh = urllib2.urlopen(request, timeout = 60 * 2)
         content = fh.read()
 
         ct = fh.headers['Content-Type']
@@ -518,7 +518,6 @@ class Store(Queue):
         self.store_path = store_path
         self.whitelist = WhiteList()
         self.blacklist = BlackList()
-        self.image_free_pass = False
 
         self.checker = Checker(store_path)
 
@@ -549,17 +548,26 @@ class Store(Queue):
     def add_white_filter(self, *args):
         for arg in args:
             if arg == "{image}":
-                self.image_free_pass = True
+                self.whitelist.add_filter("\.(jpg|jpeg|gif|png)([?#]|$)")
+            elif arg == "{css}":
+                self.whitelist.add_filter("\.css([?#]|$)")
+            elif arg == "{javascript}":
+                self.whitelist.add_filter("\.js([?#]|$)")
             else:
-                self.whitelist.add_filter(arg) 
+                self.whitelist.add_filter(arg)
 
     def add_black_filter(self, *args):
-        self.blacklist.add_filter(*args) 
+        for arg in args:
+            if arg == "{image}":
+                self.blacklist.add_filter("\.(jpg|jpeg|gif|png)([?#]|$)")
+            elif arg == "{css}":
+                self.blacklist.add_filter("\.css([?#]|$)")
+            elif arg == "{javascript}":
+                self.blacklist.add_filter("\.js([?#]|$)")
+            else:
+                self.blacklist.add_filter(arg)
 
     def pass_filters(self, job):
-        if self.is_picture(job) and self.image_free_pass:
-            return True
-
         link = job.get_joined_link()
         if self.blacklist.passed(link):
             if self.whitelist.passed(link):
@@ -568,15 +576,6 @@ class Store(Queue):
                 return False
         else:
             return False
-    def is_picture(self, job):
-        link = job.get_link()
-        if '.jpg' in link \
-            or '.jpeg' in link \
-            or '.gif' in link \
-            or '.png' in link:
-            return True
-
-        return False
 
 class DH(threading.Thread):
     '''
@@ -670,7 +669,7 @@ class DHManager:
 
 def main():
     start_time = datetime.now()
-    download_path = 'iOS_Library'
+    download_path = '../iOS2_Library'
     try:
         store = Store(download_path)
     except StoreError, e:
@@ -700,8 +699,8 @@ def main():
     #store.add_white_filter("www\.lua\.org\/pil\/", "{image}", "\.css")
     #store.put(Job("http://www.lua.org/pil/index.html"))
 
-    store.add_black_filter("\.pdf")
-    store.add_white_filter("developer\.apple\.com\/library\/ios", "{image}", "\.css")
+    store.add_black_filter("\.pdf([?#]|$)", "\.zip([?#]|$)")
+    store.add_white_filter("developer\.apple\.com\/library\/ios", "{image}", "{css}", "{javascript}")
     store.put(Job("https://developer.apple.com/library/ios/documentation/LanguagesUtilities/Conceptual/iTunesConnect_Guide/Chapters/About.html#//apple_ref/doc/uid/TP40011225"))
 
     dh_manager = None
