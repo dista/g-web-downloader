@@ -548,27 +548,22 @@ class Store(Queue):
     def get_store_path(self):
         return self.store_path
 
-    def add_white_filter(self, *args):
+    def add_filter(self, t, *args):
         for arg in args:
             if arg == "{image}":
-                self.whitelist.add_filter("\.(jpg|jpeg|gif|png)([?#]|$)")
+                t.add_filter("\.(jpg|jpeg|gif|png)([?#]|$)")
             elif arg == "{css}":
-                self.whitelist.add_filter("\.css([?#]|$)")
+                t.add_filter("\.css([?#]|$)")
             elif arg == "{javascript}":
-                self.whitelist.add_filter("\.js([?#]|$)")
+                t.add_filter("\.js([?#]|$)")
             else:
-                self.whitelist.add_filter(arg)
+                t.add_filter(arg)
+
+    def add_white_filter(self, *args):
+        self.add_filter(self.whitelist, *args);
 
     def add_black_filter(self, *args):
-        for arg in args:
-            if arg == "{image}":
-                self.blacklist.add_filter("\.(jpg|jpeg|gif|png)([?#]|$)")
-            elif arg == "{css}":
-                self.blacklist.add_filter("\.css([?#]|$)")
-            elif arg == "{javascript}":
-                self.blacklist.add_filter("\.js([?#]|$)")
-            else:
-                self.blacklist.add_filter(arg)
+        self.add_filter(self.blacklist, *args);
 
     def pass_filters(self, job):
         link = job.get_joined_link()
@@ -687,8 +682,8 @@ def main():
     #                )
     #store.put(Job("http://www.163.com"))
 
-    store.add_white_filter("www\.bxwx\.org\/b\/62\/62724\/",
-            "\.css");
+    #store.add_white_filter("www\.bxwx\.org\/b\/62\/62724\/",
+    #        "\.css");
 
     #store.put(Job("http://www.bxwx.org/b/62/62724/index.html"));
 
