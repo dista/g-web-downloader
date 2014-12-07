@@ -254,6 +254,7 @@ class SaveFileProcesser(Processer):
         if not os.path.isdir(dir):
             os.makedirs(dir, 0755)
 
+        f = None
         try:
             f = open(localpath, 'w+')
             f.write(content)
@@ -312,8 +313,9 @@ class Downloader:
                 except RememberFailedError, e:
                     raise e
                 finally:
+                    self.store.mark_as_done(job)
                     self.store.task_done()
-                
+
             link = job.get_joined_link()
             try:
                 bechmark_start = datetime.now()
@@ -670,7 +672,7 @@ class DHManager:
 
 def main():
     start_time = datetime.now()
-    download_path = '../iOS2_Library'
+    download_path = '../iOS_Library'
     try:
         store = Store(download_path)
     except StoreError, e:
