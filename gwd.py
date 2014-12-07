@@ -268,10 +268,11 @@ class Downloader:
     '''
     contains the logic to download from an url
     '''
-    white_lists =  ['text/html', 'text/css', 'text/plain', 
-                    'text/xml', 'text/javascript', 'image/png', 
-                    'image/gif', 'image/jpeg', 'application/x-javascript', 
-                    'application/xml', 'application/javascript']
+    white_lists =  ['text/html', 'text/css', 'text/plain', \
+                    'text/xml', 'text/javascript', 'image/png', \
+                    'image/gif', 'image/jpeg', 'application/x-javascript', \
+                    'application/xml', 'application/javascript', \
+                    "application/json"]
 
     """download from an url, it will download all files related with this url"""
     def __init__(self, store, mem_inst):
@@ -699,13 +700,8 @@ def main():
     #store.add_white_filter("www\.lua\.org\/pil\/", "{image}", "\.css")
     #store.put(Job("http://www.lua.org/pil/index.html"))
 
-<<<<<<< HEAD
     store.add_black_filter("\.pdf([?#]|$)", "\.zip([?#]|$)")
     store.add_white_filter("developer\.apple\.com\/library\/ios", "{image}", "{css}", "{javascript}")
-=======
-    store.add_black_filter("\.pdf")
-    store.add_white_filter("developer\.apple\.com\/library\/ios", "{image}", "\.css", "\.js")
->>>>>>> cad57a17d3ef577a3bbc7fc4056b597c2409ae9b
     store.put(Job("https://developer.apple.com/library/ios/documentation/LanguagesUtilities/Conceptual/iTunesConnect_Guide/Chapters/About.html#//apple_ref/doc/uid/TP40011225"))
 
     dh_manager = None
