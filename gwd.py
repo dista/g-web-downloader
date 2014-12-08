@@ -62,7 +62,7 @@ def debug(msg):
 SAFELOCKER = threading.Lock()
 def safe_print(msg):
     SAFELOCKER.acquire()
-    print msg
+    print "[%s] %s" % (datetime.now(), msg)
     SAFELOCKER.release()
     
 DATEFMT = "%Y-%m-%d %H:%M:%S"
@@ -355,7 +355,7 @@ class Downloader:
                 else:
                     safe_print("exceed 100 retry times")
                     #os._exit(1)
-                safe_print("error happended %s" % e)
+                safe_print("error happended %s, url %s" % (e, link))
                 traceback.print_exc()
                 #continue
             finally:
@@ -393,16 +393,20 @@ class Downloader:
             if fh.headers['Content-Encoding'] == 'gzip':
                 content = self.__ungzip(content)
 
-        con_charset = 'utf-8'
-        match = re.search(r'charset="([^"]+)"', ct)
+        con_charset = None
+        match = re.search(r'charset=([^"]+)', ct)
         if match:
-            con_charset = match.groups()[0];
+            con_charset = match.groups()[0].lower()
         else:
-            match = re.search(r'charset="([^"]+)"', content)
+            match = re.search(r'[\t ]+charset=(["\']?)([^"\']+)\1', content)
             if match:
-                con_charset = match.groups()[0]
+                con_charset = match.groups()[1].lower()
 
-        content = content.decode(con_charset)
+        if con_charset == None:
+            con_charset = "utf-8"
+
+        if con_charset != None:
+            content = content.decode(con_charset)
 
         if con_type in Downloader.white_lists:
             return (content, con_type, con_charset)
@@ -717,6 +721,7 @@ def main():
     #fd = urllib2.urlopen(request)
     lists = json.load(urllib2.urlopen(request));
 
+    store.put(Job("https://developer.apple.com/library/ios/navigation/index.html"))
     for doc in lists["documents"]:
         url = doc[9]
 
