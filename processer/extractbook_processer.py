@@ -485,7 +485,7 @@ class ExtractBookProcesser(Processer, HTMLParser):
         self.rules['volume']['start_handler'] = self.__on_volume_start
         self.rules['content'] = self.__create_rule(rule['content']) 
 
-    def do_process(self, job, c_t, content):
+    def do_process(self, job, c_t, c_charset, content):
         if c_t not in ['text/html']:
             return
 

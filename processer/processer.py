@@ -26,5 +26,5 @@
 # either expressed or implied, of the FreeBSD Project.
 
 class Processer:
-    def do_process(self, job, c_t, content):
+    def do_process(self, job, c_t, c_charset, content):
         pass

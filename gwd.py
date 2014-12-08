@@ -166,7 +166,6 @@ class Parser:
         for fd in founded:
             full = fd[0]
             link = fd[link_pos]
-            #print link
 
             ps_ret = urlparse.urlparse(link)
             t = urlparse.urlparse(urlparse.urljoin(self.url, link))
@@ -244,7 +243,7 @@ class SaveFileProcesser(Processer):
     def __init__(self, store):
         self.store = store
 
-    def do_process(self, job, c_t, content):
+    def do_process(self, job, c_t, c_charset, content):
         localpath = Utility.get_local_path(job.get_referer(), job.get_link(), False)
         localpath = os.path.join(self.store.get_store_path(), localpath) 
 
@@ -257,7 +256,7 @@ class SaveFileProcesser(Processer):
         f = None
         try:
             f = open(localpath, 'w+')
-            f.write(content)
+            f.write(content.encode(c_charset))
 
         except IOError:
             safe_print("can't write to %s" % localpath)
@@ -319,7 +318,7 @@ class Downloader:
             link = job.get_joined_link()
             try:
                 bechmark_start = datetime.now()
-                c, c_t = self.get_content(job)
+                c, c_t, c_charset = self.get_content(job)
                 bechmark_end = datetime.now()
                 safe_print("download %s, takes %s" % (link, bechmark_end - bechmark_start))
 
@@ -329,7 +328,7 @@ class Downloader:
                 else:
                     links = []
 
-                self.processer.do_process(job, c_t, c);
+                self.processer.do_process(job, c_t, c_charset, c);
 
                 self.mem_inst.remember(job, links)
                 for lk in links:
@@ -357,7 +356,7 @@ class Downloader:
                     safe_print("exceed 100 retry times")
                     #os._exit(1)
                 safe_print("error happended %s" % e)
-                #traceback.print_exc()
+                traceback.print_exc()
                 #continue
             finally:
                 self.store.task_done()
@@ -394,11 +393,22 @@ class Downloader:
             if fh.headers['Content-Encoding'] == 'gzip':
                 content = self.__ungzip(content)
 
+        con_charset = 'utf-8'
+        match = re.search(r'charset="([^"]+)"', ct)
+        if match:
+            con_charset = match.groups()[0];
+        else:
+            match = re.search(r'charset="([^"]+)"', content)
+            if match:
+                con_charset = match.groups()[0]
+
+        content = content.decode(con_charset)
+
         if con_type in Downloader.white_lists:
-            return (content, con_type)
+            return (content, con_type, con_charset)
         else:
             safe_print(con_type)
-            return ("", con_type)
+            return ("", con_type, con_charset)
 
 class Filter:
     '''
@@ -669,7 +679,7 @@ class DHManager:
 
 def main():
     start_time = datetime.now()
-    download_path = '../iOS_Library'
+    download_path = '/var/www/html/iOS3_Library'
     try:
         store = Store(download_path)
     except StoreError, e:
@@ -699,9 +709,24 @@ def main():
     #store.add_white_filter("www\.lua\.org\/pil\/", "{image}", "\.css")
     #store.put(Job("http://www.lua.org/pil/index.html"))
 
+    # for downloading ios document
+    import json
+    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 6.2; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/32.0.1667.0 Safari/537.36"}
+
+    request = Request("https://developer.apple.com/library/ios/navigation/library.json", None, headers)
+    #fd = urllib2.urlopen(request)
+    lists = json.load(urllib2.urlopen(request));
+
+    for doc in lists["documents"]:
+        url = doc[9]
+
+        if not url.endswith("mov"):
+            store.put(Job(url, "https://developer.apple.com/library/ios/navigation/#section=Topics&topic=Audio%20%26amp%3B%20Video"))
+
     store.add_black_filter("\.pdf([?#]|$)", "\.zip([?#]|$)")
     store.add_white_filter("developer\.apple\.com\/library\/ios", "{image}", "{css}", "{javascript}")
-    store.put(Job("https://developer.apple.com/library/ios/documentation/LanguagesUtilities/Conceptual/iTunesConnect_Guide/Chapters/About.html#//apple_ref/doc/uid/TP40011225"))
+    #store.put(Job("https://developer.apple.com/library/ios/referencelibrary/GettingStarted/RoadMapiOSCh/index.html#//apple_ref/doc/uid/TP40012668"))
+    #store.put(Job("https://developer.apple.com/library/ios/documentation/LanguagesUtilities/Conceptual/iTunesConnect_Guide/Chapters/About.html#//apple_ref/doc/uid/TP40011225"))
 
     dh_manager = None
     try:
