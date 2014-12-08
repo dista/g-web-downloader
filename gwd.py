@@ -38,7 +38,6 @@ import hashlib
 import urlparse
 import os
 import traceback
-import sys
 import thread
 from os import path
 from datetime import datetime
@@ -50,6 +49,9 @@ import gzip
 import signal
 
 import gc
+import sys
+reload(sys)
+sys.setdefaultencoding('utf-8')
 
 # for trace memory
 #from guppy import hpy
@@ -145,18 +147,18 @@ class Parser:
     back_images_regex = re.compile(r"(url\s*\(\s*([\"']*)([^\"'()]+)\2)\)", re.IGNORECASE)
     css_import_regex = re.compile(r"(@import\s*\(\s*([\"']*)([^\"'()]+)\2)\)", re.IGNORECASE)
 
-    def parse(self, content, url, store_path):
+    def parse(self, content, url, store_path, c_charset):
         self.store_path = store_path.rstrip('/')
         self.content = content
         self.url = url
 
         links = []
         for rx, link_pos in [(Parser.href_regex, 2), (Parser.src_regex, 2), (Parser.back_images_regex, 2), (Parser.css_import_regex, 2)]:
-            links += self.replace_url_in_content(rx, link_pos)
+            links += self.replace_url_in_content(rx, link_pos, c_charset)
 
         return links
 
-    def replace_url_in_content(self, regex, link_pos):
+    def replace_url_in_content(self, regex, link_pos, c_charset):
         '''
         file will be store in local disk, so we need to replace the original urls in them with the one using file: schemal
         '''
@@ -173,6 +175,8 @@ class Parser:
             if t.scheme == 'http' or t.scheme == 'https':
                 new_full = full.replace(link, "%s#%s" % (Utility.get_local_path(self.url, link), ps_ret.fragment))
                 self.content = self.content.replace(full, new_full) 
+                #if c_charset:
+                #    link.encode(c_charset)
                 links.append(link)
 
         return links
@@ -201,7 +205,7 @@ class Memory:
             f = open(self.get_memery_place(job), 'w')
             for link in links:
                 new_job = Job(link, job.get_joined_link())
-                f.write(new_job.get_joined_link() + "\n")
+                f.write(("%s\n" % new_job.get_joined_link()))
         except IOError, e:
             raise RememberFailedError(e)
         finally:
@@ -256,7 +260,12 @@ class SaveFileProcesser(Processer):
         f = None
         try:
             f = open(localpath, 'w+')
-            f.write(content.encode(c_charset))
+            #if c_charset != None:
+            #    f.write(content.encode(c_charset))
+            #else:
+            #    f.write(content)
+
+            f.write(content)
 
         except IOError:
             safe_print("can't write to %s" % localpath)
@@ -323,7 +332,7 @@ class Downloader:
                 safe_print("download %s, takes %s" % (link, bechmark_end - bechmark_start))
 
                 if c_t in ['text/html', 'text/css']:
-                    links = self.parser.parse(c, link, self.store.get_store_path())
+                    links = self.parser.parse(c, link, self.store.get_store_path(), c_charset)
                     c = self.parser.get_changed_content()
                 else:
                     links = []
@@ -393,20 +402,20 @@ class Downloader:
             if fh.headers['Content-Encoding'] == 'gzip':
                 content = self.__ungzip(content)
 
+        print ct
         con_charset = None
-        match = re.search(r'charset=([^"]+)', ct)
-        if match:
-            con_charset = match.groups()[0].lower()
-        else:
-            match = re.search(r'[\t ]+charset=(["\']?)([^"\']+)\1', content)
+        if con_type == "text/html" or con_type == "text/css":
+            match = re.search(r'charset=([^"]+)', ct)
             if match:
-                con_charset = match.groups()[1].lower()
+                con_charset = match.groups()[0].lower()
+            elif con_type == "text/html":
+                match = re.search(r'[\t ]+charset=(["\']?)([^"\']+)\1', content)
+                if match:
+                    con_charset = match.groups()[1].lower()
 
-        if con_charset == None:
-            con_charset = "utf-8"
-
-        if con_charset != None:
-            content = content.decode(con_charset)
+            if con_charset == None:
+                con_charset = "utf-8"
+            #content = content.decode(con_charset)
 
         if con_type in Downloader.white_lists:
             return (content, con_type, con_charset)
@@ -604,7 +613,7 @@ class DH(threading.Thread):
             self.downloader.download()
         except Exception, e:
             safe_print(e)
-            #traceback.print_exc()
+            traceback.print_exc()
             thread.exit()
 
     def kill(self):
@@ -714,6 +723,7 @@ def main():
     #store.put(Job("http://www.lua.org/pil/index.html"))
 
     # for downloading ios document
+   
     import json
     headers = {"User-Agent": "Mozilla/5.0 (Windows NT 6.2; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/32.0.1667.0 Safari/537.36"}
 
@@ -727,7 +737,8 @@ def main():
 
         if not url.endswith("mov"):
             store.put(Job(url, "https://developer.apple.com/library/ios/navigation/#section=Topics&topic=Audio%20%26amp%3B%20Video"))
-
+ 
+    #store.put(Job("https://developer.apple.com/library/ios/recipes/xcode_help-IB_auto_layout/_index.html#//apple_ref/doc/uid/TP40014226"))
     store.add_black_filter("\.pdf([?#]|$)", "\.zip([?#]|$)")
     store.add_white_filter("developer\.apple\.com\/library\/ios", "{image}", "{css}", "{javascript}")
     #store.put(Job("https://developer.apple.com/library/ios/referencelibrary/GettingStarted/RoadMapiOSCh/index.html#//apple_ref/doc/uid/TP40012668"))
