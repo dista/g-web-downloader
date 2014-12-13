@@ -12,7 +12,7 @@
 Filters is based on regex basically. 
 There are two kind of filters. One is white filter, and the other is black.
 White filter means if the filter match the url, the url will be downloaded. The black filter do the opposite.
-Besides regex filter, a meta-filter({image}) is implemented right now. It presents image resource, including jpeg,
+Besides regex filter, meta-filters({image}, {javascript}, {css}) are implemented right now. It presents image resource, including jpeg,
 gif and png resource.
 
 
@@ -28,7 +28,7 @@ using corret filter you can download the reference perfectly -- see example belo
 add following lines to main()
 
 ```python
-store.add_white_filter("www\.lua\.org\/pil\/", "{image}", "\.css")
+store.add_white_filter("www\.lua\.org\/pil\/", "{image}", "{css}")
 store.put(Job("http://www.lua.org/pil/index.html"))
 ```
 
