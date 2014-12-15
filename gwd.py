@@ -329,7 +329,7 @@ class Downloader:
                 bechmark_start = datetime.now()
                 c, c_t, c_charset = self.get_content(job)
                 bechmark_end = datetime.now()
-                safe_print("download %s, takes %s" % (link, bechmark_end - bechmark_start))
+                safe_print("[%d]download %s, takes %s" % (self.store.qsize(), link, bechmark_end - bechmark_start))
 
                 if c_t in ['text/html', 'text/css']:
                     links = self.parser.parse(c, link, self.store.get_store_path(), c_charset)
@@ -692,7 +692,7 @@ class DHManager:
 
 def main():
     start_time = datetime.now()
-    download_path = '/var/www/html/iOS3_Library'
+    download_path = 'iOS3_Library'
     try:
         store = Store(download_path)
     except StoreError, e:
